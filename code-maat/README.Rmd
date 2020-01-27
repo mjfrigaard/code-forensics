@@ -184,11 +184,7 @@ java -jar code-maat-1.0-standalone.jar -l logfile.log -c git2 > code_maat_log.cs
 # cat code_maat_log.csv
 ```
 
-This shows us the `entity,n-authors,n-revs`. But these results are not in the `logfile.log` file, and we can tell by printing the contents of `logfile.log` file to the Terminal.
-
-```{bash}
-cat logfile.log
-```
+This shows us the `entity,n-authors,n-revs`. 
 
 ### Print `-summary`
 
@@ -206,24 +202,38 @@ We will run the same code from above in the [`code maat` package repo](https://g
 cd downloads/code-maat-master
 # check to see where you are!
 # pwd
-
 # create logfile.log
-touch logfile.log
+git log --all --numstat --date=short --pretty=format:'--%h--%ad--%aN' --no-renames --after=2017-01-31 > logfile.log
 # verify new file
 # ls -la 
+```
 
+```{bash}
+cd downloads/code-maat-master
 ## ===== run the git2 java jar script ===== ##
-
 # /-- this is the previous script:
 #     java -jar code-maat-standalone.jar -c git2 -l maat.log -a coupling 
 # --/ we'll be repeating this but with the new standalone.jar
-java -jar code-maat-1.0-standalone.jar -c git2 -l logfile.log
+java -jar code-maat-1.0-standalone.jar -l logfile.log -c git2 > code_maat_master_log.csv
 ```
+
+Now we can check the code maat file result. 
+
+```{bash}
+cd downloads/code-maat-master
+head -n 7 code_maat_master_log.csv
+```
+
+If we import this into RStudio, we can visualize the 
 
 ### Print `-a coupling`
 
+Now we will create another log file (couplinglog)
+
 ```{bash}
-java -jar code-maat-1.0-standalone.jar -l logfile.log -c git -a coupling
+# cd downloads/code-maat-master
+git log --all --numstat --date=short --pretty=format:'--%h--%ad--%aN' --no-renames --after=2017-01-31 > couplinglog.log
+java -jar code-maat-1.0-standalone.jar -l logfile.log -c git2 -a coupling
 ```
 
 This is showing the headers for the data, but not the actual numbers...
