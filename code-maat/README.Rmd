@@ -86,6 +86,14 @@ We've downloaded the jar files from Tornhill's website, available [here](http://
 fs::dir_tree("downloads", recurse = FALSE)
 ```
 
+## Generate git log file
+
+```{bash}
+git log --all --numstat --date=short --pretty=format:'--%h--%ad--%aN' --no-renames --after=2018-01-31 > logfile.log
+# cat logfile.log
+```
+
+
 ### Quick description of code maat
 
 What does code maat do?
@@ -168,10 +176,12 @@ We can see the `logfile.log` file in the parent folder.
 
 ## Step 6: Running code maat 
 
+
 We can now use the `java -jar` command coupled with `code-maat-1.0-standalone.jar` to run `code maat` with the `bash` commands below.
 
 ```{bash}
-java -jar code-maat-1.0-standalone.jar -l logfile.log -c git2
+java -jar code-maat-1.0-standalone.jar -l logfile.log -c git2 > code_maat_log.csv
+# cat code_maat_log.csv
 ```
 
 This shows us the `entity,n-authors,n-revs`. But these results are not in the `logfile.log` file, and we can tell by printing the contents of `logfile.log` file to the Terminal.
@@ -216,5 +226,12 @@ java -jar code-maat-1.0-standalone.jar -c git2 -l logfile.log
 java -jar code-maat-1.0-standalone.jar -l logfile.log -c git -a coupling
 ```
 
+This is showing the headers for the data, but not the actual numbers...
+
 >  These repos aren't showing any data--any ideas?
+
+```{bash}
+
+```
+
 
