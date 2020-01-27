@@ -1,5 +1,5 @@
 ---
-title: "code maat - Clojure to R"
+title: "code maat - installing and running clojure"
 author: "Martin Frigaard, MA, MAS"
 date: "`r Sys.Date()`"
 output: 
@@ -210,12 +210,7 @@ touch logfile.log
 java -jar code-maat-1.0-standalone.jar -c git2 -l logfile.log
 ```
 
-
-
-```{bash}
-cd downloads/code-maat-master
-java -jar code-maat-1.0-standalone.jar -l logfile.log -c git2 -a summary
-```
+### Print `-a coupling`
 
 ```{bash}
 java -jar code-maat-1.0-standalone.jar -l logfile.log -c git -a coupling
