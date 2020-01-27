@@ -64,4 +64,9 @@ ggplot2::theme_set(hrbrthemes::theme_ipsum_tw(
 ))
 ```
 
+## Project files
+
+```{r, echo=FALSE}
+fs::dir_tree(".", recurse = FALSE)
+```
 
