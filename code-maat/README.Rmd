@@ -1,0 +1,225 @@
+---
+title: "code maat - Clojure to R"
+author: "Martin Frigaard, MA, MAS"
+date: "`r Sys.Date()`"
+output: 
+  github_document: 
+    fig_height: 6
+    fig_width: 8
+    toc: yes
+---
+
+```{r setup, include=FALSE}
+library(hrbrthemes)
+library(extrafont)
+library(knitr)
+library(rmdformats)
+library(tidyverse)
+library(magrittr)
+library(skimr)
+library(rlang)
+library(gt)
+library(visdat)
+library(inspectdf)
+library(foreign)
+library(naniar)
+# figs folder
+if (!file.exists("figs")) {
+  dir.create("figs")
+}
+knitr::opts_chunk$set(
+  eval = TRUE, # we will run these as needed!
+  echo = TRUE,
+  cache = FALSE,
+  prompt = FALSE,
+  tidy = FALSE,
+  fig.width = 10,
+  fig.height = 7.5,
+  comment = "#>",
+  message = FALSE,
+  warning = FALSE,
+  fig.path = "figs/"
+)
+knitr::opts_knit$set(
+  width = 78
+)
+base::options(
+  tibble.print_max = 25,
+  tibble.width = 78,
+  scipen = 100000000
+)
+options(max.print = 10000)
+# theme ----
+ggplot2::theme_set(hrbrthemes::theme_ipsum_tw(
+  base_size = 10,
+  strip_text_size = 11,
+  axis_title_size = 13,
+  plot_title_size = 17,
+  subtitle_size = 13,
+  base_family = "Ubuntu",
+  strip_text_family = "TitilliumWeb-Regular",
+  axis_title_family = "TitilliumWeb-Regular",
+  subtitle_family = "TitilliumWeb-Regular",
+  plot_title_family = "JosefinSans-Regular"
+))
+```
+
+# Installing code maat 
+
+code maat tool is free and open source on [Github](https://github.com/adamtornhill/code-maat). This tool was developed by Tornhill and is implemented in Clojure. 
+
+## Step 1: Print Java version 
+
+The version of Java is accessible via `java -version`
+
+```{bash}
+java -version
+```
+
+The Java version on this machine is new enough.
+
+## Step 2: `code maat` jar files
+
+We've downloaded the jar files from Tornhill's website, available [here](http://adamtornhill.com/code/maatdistro.htm). These files are stored in the `downloads` folder. 
+
+```{r downloads, eval=TRUE}
+fs::dir_tree("downloads", recurse = FALSE)
+```
+
+### Quick description of code maat
+
+What does code maat do?
+
+> Code Maat operates on the level of log files generated from any of several version-control systems (including Subversion, TFS, Git, and others), and the GitHub page contains detailed instructions on how to generate the input data to the tool. 
+
+We'll go through the installation instructions on page 216 of the SDXR text. 
+
+> Once you have a log file you feed it to Code Maat, which parses the log file and then performs any of the `file-` or `architectural-` level analyses discussed in this book. You specify the type of analysis via a command-line argument. Here’s an example of a change coupling analysis, specified through the `-a` coupling argument, and using one of the supported Git formats where the version-control log is stored in the file `vcs_log.txt`:
+
+```bash
+$ java -jar code-maat-standalone.jar -c git2 -l maat.log -a coupling
+
+entity,coupled,degree,average-revs
+analysis/effort.clj,analysis/effort_test.clj,100,5
+analysis/churn.clj,analysis/churn_test.clj,89,15
+parsers/git.clj,parsers/git_test.clj,80,24
+```
+
+> Since pure text is the universal interface it allows you to postprocess that data or visualize it as discussed later in this appendix.
+
+Where is `vsc_log.txt`? We need a bit more information to get this setup, so we'll head over to the Github page. 
+
+## Step 3: Install `leinigen` (for `uberjar`)
+
+First we need to install `leinigen` package with homebrew: 
+
+```{bash}
+brew install leiningen
+```
+
+Read more about [homebrew packaging](https://github.com/technomancy/leiningen/wiki/Packaging).
+
+## Step 4: using `uberjar` with leiningen
+
+We'll begin by building the .jar code from source using `lein uberjar` [see source here](https://github.com/adamtornhill/code-maat#usage), but we need to make sure the clojure project file has been created and saved in the same directory we are currently working in.
+
+### Step 4.1: Create a `project.clj` file
+
+We need to put the following contents in a file titled, `project.clj`
+
+```{clojure, eval=FALSE}
+(defproject myproject "0.5.0-SNAPSHOT"
+  :description "A project for doing things."
+  :license "Eclipse Public License 1.0"
+  :url "http://github.com/technomancy/myproject"
+  :dependencies [[org.clojure/clojure "1.8.0"]]
+  :plugins [[lein-tar "3.2.0"]])
+```
+
+This file is located in the parent directory, 
+
+```{r project.clj}
+fs::dir_tree(".", recurse = FALSE)
+```
+
+After installation, we can proceed with the installation of the `uberjar` package.  
+
+```{bash}
+lein uberjar
+```
+
+Executing the code file below creates the `target/` directory.
+
+```{r target}
+fs::dir_tree("target")
+```
+
+## Step 5: Creating a `logfile.log`
+
+In order to store the output data in a file we can access, we'll need to create a log file using `touch` and the name of the file, like `logfile.log`.
+
+```{bash}
+touch "logfile.log"
+# verify
+ls
+```
+
+We can see the `logfile.log` file in the parent folder. 
+
+## Step 6: Running code maat 
+
+We can now use the `java -jar` command coupled with `code-maat-1.0-standalone.jar` to run `code maat` with the `bash` commands below.
+
+```{bash}
+java -jar code-maat-1.0-standalone.jar -l logfile.log -c git2
+```
+
+This shows us the `entity,n-authors,n-revs`. But these results are not in the `logfile.log` file, and we can tell by printing the contents of `logfile.log` file to the Terminal.
+
+```{bash}
+cat logfile.log
+```
+
+### Print `-summary`
+
+Now that everything seems to be working, we can use the `-c git2 -a summary` commands to get the commits, entities, entities-changed, and authors. 
+
+```{bash}
+java -jar code-maat-1.0-standalone.jar -l logfile.log -c git2 -a summary
+```
+
+### Running code maat in `code-maat` repo (super meta)
+
+We will run the same code from above in the [`code maat` package repo](https://github.com/adamtornhill/code-maat) to see if it works on an outside Git repo. 
+
+```{bash}
+cd downloads/code-maat-master
+# check to see where you are!
+# pwd
+
+# create logfile.log
+touch logfile.log
+# verify new file
+# ls -la 
+
+## ===== run the git2 java jar script ===== ##
+
+# /-- this is the previous script:
+#     java -jar code-maat-standalone.jar -c git2 -l maat.log -a coupling 
+# --/ we'll be repeating this but with the new standalone.jar
+java -jar code-maat-1.0-standalone.jar -c git2 -l logfile.log
+```
+
+
+
+```{bash}
+cd downloads/code-maat-master
+java -jar code-maat-1.0-standalone.jar -l logfile.log -c git2 -a summary
+```
+
+```{bash}
+java -jar code-maat-1.0-standalone.jar -l logfile.log -c git -a coupling
+```
+
+>  These repos aren't showing any data--any ideas?
+

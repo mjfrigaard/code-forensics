@@ -1,0 +1,310 @@
+---
+title: "Aperture - Git log data"
+date: "`r Sys.Date()`"
+output: github_document
+---
+
+
+```{r setup, echo = FALSE, cache = FALSE, message=FALSE, warning=FALSE}
+library(knitr)
+library(rmdformats)
+require(tidyverse)
+library(plotly)
+require(janitor)
+require(skimr)
+library(mosaic)
+library(inspectdf)
+library(visdat)
+library(DT)
+library(hrbrthemes)
+# knitr chunk options ----
+knitr::opts_chunk$set(
+  echo = TRUE, # show/hide all code
+  # results = "hide", # hide results
+  tidy = FALSE, # cleaner code printing
+  comment = "#> ", # better console printing
+  eval = TRUE, # turn this to FALSE stop code chunks from running
+  message = TRUE, # show messages
+  fig.width = 9, # figure width
+  fig.height = 7, # figure height
+  warning = FALSE, # show warnings
+  size = "small", # size of the text
+  fig.path = "figs/"
+) # location of files
+# knit settings ----
+knitr::opts_knit$set(
+  width = 78
+)
+# base options ----
+base::options(
+  tibble.print_max = 25,
+  tibble.width = 78,
+  scipen = 100000000,
+  max.print = 999999
+)
+```
+
+```{r packages, message=FALSE, warning=FALSE}
+library(cloc) # cloc (counting lines of code)
+library(gh) # github api package
+library(tidyverse) # tidy analysis tools
+library(tidymodels) # tidy modeling
+library(tidygraph) # tidy graphs
+library(tidytext) # text analysis for commit messages 
+library(ggraph) # graphing
+library(janitor) # cleaning data
+library(inspectdf) # visualizing entire data sets 
+library(skimr) # summary stats 
+library(visdat) # missing data
+```
+
+Check out the repository for this project [here]().
+
+# Motivation
+
+This document covers how to use the `git log` to get meaningful metrics about your workflow and code. Great resources for learning how to use the `git log` tools are, 
+
+1) the [online git documentation](https://git-scm.com/doc), 
+2) [Professional Git](https://www.amazon.com/Professional-Git-Brent-Laster/dp/111928497X),  
+3) [Pro Git](https://git-scm.com/book/en/v2) and  
+4) [Git for Teams](http://gitforteams.com/) 
+
+## An example repo
+
+In order to replicate the work in the Appendix 3 of Software Design X-Rays (which covers author summaries, `cloc`, and complexity), we'll need a repo. I've chosen the `ggplot2` repository because it's fairly common (and I know it's widely used by data scientists).
+
+Below is a code chunk to clone the `ggplot2` repo from Github into the parent folder. 
+
+```{bash, clone-ggplot2-repo, eval = FALSE}
+cd downloads
+pwd
+git clone https://github.com/tidyverse/ggplot2.git
+```
+
+Let's check the contents of this downloaded folder. 
+
+```{r ggplto2-tree-structure}
+fs::dir_tree("downloads/ggplot2", recurse = FALSE)
+```
+
+## Folder structures 
+
+For the sake of reproduction, the folder structure for this project is below. 
+
+```{r parent-folder}
+fs::dir_tree(".", recurse = FALSE)
+```
+
+### Path to `ggplot2` folder 
+
+The path to the `ggplot2` package folder is here: 
+
+```{r ggplot2_folder_path}
+ggplot2_folder_path <- here::here("downloads", "ggplot2")
+ggplot2_folder_path
+```
+
+We can run `bash` scritps in RStudio, so let's walk through the `regex` pattern.
+
+From `SDX`(page 8):
+
+> We use the same mental processes to understand code as those we use in everyday life beyond our keyboards (evolution wasn’t kind enough to equip our brains with a coding center). 
+
+> As we learn a topic we build mental representations of that domain. Psychologists refer to such mental models as schemas. A schema is a theoretical construct used to describe the way we organize knowledge in our memory and how we use that knowledge for a particular event. **You can think of a schema as a mental script implemented in neurons rather than code.**
+
+This is a handy way to think about code. 
+
+## Command line tools/regex for Hotspots
+
+> The command then counts the frequency of the resulting file names and delivers the results sorted in descending order:
+
+The regex pattern below is using the pipe `|` operator to chain together the git and unix commands. 
+
+### Extracting `git log` data
+
+The `git log` command returns a log of all commits. We add three options: 
+1. [`--format=format:`](https://git-scm.com/docs/git-log#_commit_formatting). This tells git how to return the logs.
+
+2. [`--name-only`](https://git-scm.com/docs/git-log#Documentation/git-log.txt---name-only). This is the name of the changed files.
+
+3. `head -n 20` - We will look at the top 20 lines from this command.
+
+```{bash, format-name-only}
+# change working directory
+cd downloads/ggplot2 
+# verify
+pwd 
+# /Users/martinfrigaard/@Working/tech-debt/ggplot2
+# now run the regex with cloc
+git log --format=format: --name-only | head -n 20
+```
+
+There are too many lines and whitespace between each output, so it needs some wrangling.
+
+### egrep 
+
+The `egrep` command removes all the lines in between each commit log item. Read more [here](https://earthsci.stanford.edu/computing/unix/editing/grep.php).  
+
+The added `-v` tells bash the "selected lines are those **not** matching any of the specified patterns."
+
+```{bash, egrep}
+# change dir
+cd downloads/ggplot2 
+git log --format=format: --name-only | egrep -v '^$' | head -n 10
+```
+
+This cleans the output up and removes some of the whitespace. 
+
+### sort and unique
+
+The next few commands sorts the output from the Git log, and then collapses them to each unique entry.
+
+1. The first [`sort`](https://ss64.com/bash/sort.html) arranges everything alphabetically, or *Sort text files. Sort, merge, or compare all the lines from the files given (or standard input.)*. 
+
+2. The `uniq -c` command reduces each file to the [unique name and count](https://ss64.com/bash/uniq.html). 
+
+3. The second [`sort -r`](https://ss64.com/bash/sort.html) puts the highest numbers to the top, or *reverse the result of comparison, so that lines with greater key values appear earlier in the output instead of later*.
+
+```{bash sort}
+# change dir
+cd downloads/ggplot2 
+# test the next
+git log --format=format: --name-only | egrep -v '^$' | sort | uniq -c | head -n 10
+```
+
+Now these contents are sorted.
+
+```{bash sort-uniq}
+# change dir
+cd downloads/ggplot2 
+# test the next
+git log --format=format: --name-only | egrep -v '^$' | sort | uniq -c | head -n 20
+```
+
+I can ignore the `sort: Broken pipe` message, because I am only viewing the output here. So now we know to get the output from the `git log`. We can create a new file called `file_name_counts.txt` and send the results to this file. 
+
+```{bash file_name_counts.txt}
+# change dir
+cd downloads/ggplot2 
+# create new file
+touch "file_name_counts.txt"
+# verify 
+ls
+```
+
+We created the file, now we have to put the output into it with the next chunk.
+
+```{bash pipe-to-file_name_counts.txt}
+# change dir
+cd downloads/ggplot2 
+# repeat commands and send to new file
+git log --format=format: --name-only | egrep -v '^$' | sort | uniq -c | sort -r >> "file_name_counts.txt"
+```
+
+Now we will move this file into current directory and read them into R. 
+
+```{r move-file_name_counts.txt}
+# check current location
+# fs::dir_ls("../ggplot2")
+fs::file_move(path = "downloads/ggplot2/file_name_counts.txt", 
+              new_path = paste0("data/", 
+                                base::noquote(lubridate::today()), 
+                                "-file_name_counts.txt"))
+# verify new location
+fs::dir_ls("data")
+```
+
+Now we can load these data into R. 
+
+```{r export-GitFileCount}
+GitFileCount <- readr::read_delim(file = paste0("data/", 
+                                            base::noquote(lubridate::today()), 
+                                            "-file_name_counts.txt"),
+                                         delim = " ", 
+                                         skip = 1, 
+                                  # column names
+                                         col_names = c("file_changes", 
+                                                       "gitlog_path"))
+```
+
+Now we have a data fame with the files and their total number of changes. 
+
+```{r skim}
+GitFileCount %>% skimr::skim()
+```
+
+
+These data are showing the `gitlog_path`, so we will create a new variable with only the `filename`.
+
+```{r create-GitFileCount-filename}
+GitFileCount <- GitFileCount %>% 
+  dplyr::mutate(filename = base::basename(gitlog_path))
+GitFileCount$filename %>% utils::head()
+```
+
+We'll make some changes to the variables so they're easier to plot. 
+
+```{r mutate}
+GitFileCount <- GitFileCount %>% 
+  dplyr::mutate(file_changes = as.numeric(file_changes),
+                filename = as.factor(filename)) 
+GitFileCount %>% dplyr::glimpse(78)
+```
+
+# Visualize file changes 
+
+Below we set a theme for some better looking graphics.
+
+```{r set-theme}
+ggplot2::theme_set(hrbrthemes::theme_ipsum_tw(
+  base_size = 10,
+  strip_text_size = 11,
+  axis_title_size = 13,
+  plot_title_size = 17,
+  subtitle_size = 13,
+  base_family = "EnvyCodeR",
+  # "JosefinSans-LightItalic"
+  strip_text_family = "TitilliumWeb-Regular",
+  axis_title_family = "TitilliumWeb-Regular",
+  subtitle_family = "TitilliumWeb-Regular",
+  plot_title_family = "JosefinSans-Regular"
+))
+```
+
+
+The graph below is a Cleveland dot plot of the files that had more than 75 changes.
+
+```{r graph-file-counts}
+# define labs first!
+file_count_labs <- ggplot2::labs(
+    y = "Number of file changes",
+    x = "Name of file",
+    title = "File changes from git log",
+    subtitle = "ggplot2 files with > 75 changes",
+    caption = "from git log --format=format: --name-only") 
+# now plot these data in a scatter plot
+GitFileCount %>% 
+  dplyr::filter(file_changes > 75) %>%  
+  ggplot2::ggplot(aes(x = fct_reorder(.f = filename,
+                             .x = file_changes),
+             y = file_changes)) +
+  ggplot2::geom_point() + 
+  ggplot2::coord_flip() +
+  file_count_labs
+```
+
+This makes sense, because the `NEWS`, `DESCRIPTION`, and `NAMESPACE` are the most commonly touched files. 
+
+## Next steps
+
+In the next section (`02-counting-lines-of-code.Rmd`), we will be counting the lines of code in each file.
+
+```{r export-file-data}
+# ls()
+readr::write_csv(as.data.frame(GitFileCount), 
+                 path = paste0("data/", 
+                         base::noquote(lubridate::today()), 
+                           "-GitFileCount.csv"))
+fs::dir_tree("data")
+```
+

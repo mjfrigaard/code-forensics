@@ -1,0 +1,441 @@
+---
+title:  "Aperture - Git author data"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+library(rmdformats)
+require(tidyverse)
+library(plotly)
+require(janitor)
+require(skimr)
+library(mosaic)
+library(inspectdf)
+library(visdat)
+library(DT)
+# knitr chunk options ----
+knitr::opts_chunk$set(
+  echo = TRUE, # show/hide all code
+  # results = "hide", # hide results
+  tidy = FALSE, # cleaner code printing
+  comment = "#> ", # better console printing
+  eval = TRUE, # turn this to FALSE stop code chunks from running
+  message = TRUE, # show messages
+  fig.width = 9, # figure width
+  fig.height = 7, # figure height
+  warning = FALSE, # show warnings
+  size = "small", # size of the text
+  fig.path = "figs/"
+) # location of files
+# knit settings ----
+knitr::opts_knit$set(
+  width = 78
+)
+# base options ----
+base::options(
+  tibble.print_max = 25,
+  tibble.width = 78,
+  scipen = 100000000,
+  max.print = 999999
+)
+# set the theme
+ggplot2::theme_set(hrbrthemes::theme_ipsum_tw(
+  base_size = 10,
+  strip_text_size = 11,
+  axis_title_size = 13,
+  plot_title_size = 17,
+  subtitle_size = 13,
+  base_family = "EnvyCodeR",
+  # "JosefinSans-LightItalic"
+  strip_text_family = "TitilliumWeb-Regular",
+  axis_title_family = "TitilliumWeb-Regular",
+  subtitle_family = "TitilliumWeb-Regular",
+  plot_title_family = "JosefinSans-Regular"
+))
+```
+
+Check out the repository for this project [here]().
+
+## The git log 
+
+We can use `git log --graph` to see a plain text representation of the file changes. The asterisk (`*`) shows which branch the commit was on, so the graph below tells us that the `8f27d7a8` and `82297c05` commits are on a topic branch and the rest are on the `master` branch.
+
+```{bash }
+# change dir
+cd downloads/ggplot2 
+# check the git log with the -L option
+git log --graph --oneline --decorate | head -n 75
+```
+
+### Narrowing the dates of the `git log`
+
+We can use `--before` and `--after` or `--since="YYYY-M-D"` and `--until="YYYY-MM-DD"` to specify the range of dates in the `git log`. This comes in handy if we want to limit the scope of the log results. To display all the commits added between December 1st, 2017 and January 15th, 2017, you would use the following:
+
+```{bash after-2016}
+# change dir
+cd downloads/ggplot2 
+# test after 2016
+git log --after="2016-12-1" --before="2017-1-15" --format=format: --name-only --oneline | egrep -v '^$' | sort | uniq -c | sort -r | head -n 10
+# git log --format=format: --name-only --after=12.31.2016 | egrep -v '^$' | sort | uniq -c | sort -r | head -n 10
+```
+
+### Word count (`wc`)
+
+We can also use a range of commits using either `--since` or `--until`. For example, we might only want to know how many changes were made to `ggplot2` for one month after publication of the R for Data Science book (in 2017).
+
+```{bash since-until}
+# change dir
+cd downloads/ggplot2 
+# since 2017-2018
+git log --since="2017-1-1" --until="2017-12-31" | grep 'commit' | wc -l
+```
+
+Or the `--after` and `--before`
+
+```{bash after-before}
+# change dir
+cd downloads/ggplot2 
+# since 2017-2018
+git log --after="2017-1-1" --before="2017-12-31" | grep 'commit' | wc -l
+```
+
+We are going to start with some basic `git log` options.
+
+## Calculate hotspots by level of logical components
+
+The `--rev-list` is considered a plumber command, and is used to return a set of commits bounded by some range or criteria. The Software X-rays book defines this in the following sentence, 
+
+> Use `git rev-list --count HEAD` to aggregate all contributions and calculate hotspots on the level of logical components.  
+
+The syntax above is how we can count the number of the contributions (file changes) in particular files. Consider the layout od the following folder. 
+
+```{r raw-data-folder}
+fs::dir_tree("downloads/ggplot2", recurse = FALSE)
+```
+
+## The revision list (`git rev-list` for contributions)
+
+According to Tornhill, 
+
+`git rev-list --count HEAD` will *aggregate all contributions and calculate hotspots on the level of logical components.*
+
+The language parsers might be the reason for running into some limitation in the `ggplot2` package. Below is the contribution from the 2016 text, Professional Git,
+
+> *Notice the <`rev-list options`> in the last line on the command line in the previous section. Git `rev-list` is another plumbing command. Its main use is to list a set of commits bounded by some range or criteria. It’s pretty straightforward to use, so I’ll just share the syntax here. You can use the `rev-list` help page to find out more details on specifying ranges if you’re interested.*
+
+### Count the changes to files within a folder
+
+If we want to see the relative contributions to each project we can use the following command to narrow the file changes to the `man` folder. 
+
+```{bash rev-list-2}
+# change dir
+cd downloads/ggplot2 
+# get rev-list data-raw
+git rev-list --count HEAD -- man
+```
+
+The output above is telling us the number of file changes in the `man` folder. But we can extend this command to a particular *file* within a specified folder. For example, compare the number of changes to the `R` folder to the number of changes to the `layer.r` file in the `R` folder (shown below):
+
+```{bash rev-list-count-layer-file}
+# change dir
+cd downloads/ggplot2 
+# get rev-list R
+git rev-list --count HEAD -- R/layer.r
+```
+
+And, as expected, this number is way less (`227`), than the `R` folders (`3310`) shown below. On Github, we can read up on the [How it works](https://github.com/AlDanial/cloc#how-it-works-) section from the repo. I've created a PDF for this too (find it in the `meta` portion of this repo).
+
+```{bash rev-list-count-layer-r-folder}
+# change dir
+cd downloads/ggplot2 
+# get rev-list R
+git rev-list --count HEAD -- R
+```
+
+This could be used to show what files make up the majority of the changes within a folder (i.e. how many of the total changes in this folder are this particular file?).
+
+## Historic revisions based on a function or lines of code 
+
+The `git log -L` is what we will use to get more details on the changes to the actual lines of code. From the `SDX` text,
+
+> *In that case you specify the `-L` option, which instructs Git to fetch each historic revision based on the range of lines of code that make up a function. Here’s an example on Linux to X-Ray the `intel_crtc_page_flip` function in the `drivers/gpu/drm/i915/intel_display.c` hotspot:*
+
+Recall that `git log` gives the,
+
+> *the complete state of the code as it looked in each revision. This comes in handy if you want to calculate complexity trends.* 
+
+So, this is parsing a `.c` file, but we can attempt to replicate this on one of `.R` files. In order to get all the available statistics, we might need to find a repo with a language that `cloc` documents. I know `cloc` won't count the `.Rd` files, but that's not a deal sealer...
+
+### `git log -L` based on specific file
+
+The `git log -L` syntax follows the following structure for getting the log on a particular file. 
+
++ `git log -L:` :`function`:`path/to/file/with/function.R`
+
+Let's use the `R/layer.r` file, and the `function` function. We're going to assume here that the general form of the following code,
+
++ `git log -L:intel_crtc_page_flip:drivers/gpu/drm/i915/intel_display.c`
+
+Can be re-written using:
+
++ `git log -L:layer:R/layer.r`
+
+We're going to be looking for `layer` (because this is the function the file defines), and we will see how many changes this function had over the course of the project. We'll test this with the top (`head -n 50`) of the commit log:
+
+```{bash head-layer-file}
+# change dir
+cd downloads/ggplot2 
+# get head 
+git log -L:layer:R/layer.r | head -n 50
+```
+
+Here we can see a change from Claus Wilke in August of 2019, the `git commit` message is at the top of the output. Let's compare this to the bottom of `git log -L` results, 
+
+```{bash bottom-layer-function}
+# change dir
+cd downloads/ggplot2 
+# get tail
+git log -L:layer:R/layer.r | tail -n 63
+```
+
+Here we can see a change from Hadley from January of 2015, and a git commit message: `Minor style and doc tweaks.` Some important things to remember about these commands is that **they will produce a lot of output (it's all changes to each file)**, especially to files that have seen lots of revisions. 
+
+We can see why `layer.r` would be considered a hotspot, and it's because it has had many changes, and these changes are large in nature.  
+
+> "The command outputs the complete state of the code as it looked in each revision. This comes in handy if you want to calculate complexity trends
+
+
+### `git log -L` changes by line number 
+
+So `git log -L` option also gives us the total changes for a set of lines (indicated with line numbers), or by specifying a function (by name) within a particular file (indicated by path).
+
+```bash
+git log -L <start line number>,<end line number>:<file name>
+```
+
+## Tech debt interest rate (the change frequency of the hotspot)
+
+The hotspots and commits can be used to calculate the *technical debt interest rate*, 
+
+> If you just want to get a proxy for the technical debt interest rate, then you can count the change frequency of the hotspot function by means of commandline tools. Here’s an example from a Bash shell where `grep` filters out each commit hash, `wc -l` counts them, and the `--after` option limits the amount of data to a recent development period: 
+
+### Word counts 
+
+So if we want to check the technical debt of *a particular function within a particular file (gauged by it's change frequency)*, we can use the following commands to see how many changes have been made to the `layer` function in the `layer.r` file.
+
+```{bash check-changes-to-layer}
+# change dir
+cd downloads/ggplot2 
+# since the beginning of time
+git log -L:layer:R/layer.r | grep 'commit ' | wc -l 
+```
+
+If we are adjusting for date, we can get a range of dates with `--after="2017-1-1"` and `--before="2017-12-31"`.
+
+```{bash before-after}
+# change dir
+cd downloads/ggplot2 
+# between 2015-01-01 and 2019-09-02
+git log -L:layer:R/layer.r --after="2015-1-1" --before="2019-9-2" | grep 'commit' | wc -l
+# between 2015-01-01 and 2019-09-03
+git log -L:layer:R/layer.r --after="2015-1-1" --before="2019-9-3" | grep 'commit' | wc -l
+```
+
+These are counting up as `0`
+
+```{bash after-before-since-until}
+# change dir
+cd downloads/ggplot2 
+# check after
+git log -L:layer:R/layer.r --after="2016-01-01" | grep 'commit' | wc -l 
+# check before 
+git log -L:layer:R/layer.r --before="2019-01-01" | grep 'commit' | wc -l 
+# check since 
+git log -L:layer:R/layer.r --since="2015-1-1" | grep 'commit' | wc -l 
+# check until
+git log -L:layer:R/layer.r --until="2018-8-16" | grep 'commit' | wc -l 
+```
+
+This shows a relatively low number of changes to `layer` in the `layer.R` over time, but it depends on the date (which is in a strange format).
+
+## Author Summaries with `git shortlog -s`
+
+Author summaries are extracted using the `git shortlog`. This is a commmand that lists who the authors were for each commit. Below is an example of running this command in the `ggplot2` folder. 
+
+```bash
+# change dir
+cd downloads/ggplot2
+# check shortlog (summary, unique, sorted, and only return 12)
+git shortlog -s | uniq -c | sort -r | head -n 12
+```
+
+For some reason, this wouldn't run in RStudio, but it will run in the Terminal window (see below).
+
+```bash
+   1   2343     hadley
+   1    653     Winston Chang
+   1    134     Hadley Wickham
+   1    133     Thomas Lin Pedersen
+   1    103     Kohske Takahashi @ jurina
+   1     70     Kohske Takahashi at Haruna
+   1     69     hadley wickham
+   1     67     Claus Wilke
+   1     63     Jean-Olivier Irisson
+   1     60     Hiroaki Yutani
+   1     57     Lionel Henry
+   1     50     Dewey Dunnington
+# omitted...
+```
+
+Let's create a new file and save the author summaries so they can be read into RStudio. 
+
+```bash
+# change dir
+cd downloads/ggplot2
+# create files
+touch "author_summary.txt" 
+# ls
+git shortlog -s | uniq -c | sort -r >> author_summary.txt
+```
+
+This will show you the message, `(reading log message from standard input)` and it will take a bit for this to quit running. But when it is done, we can read this file into RStudio. 
+
+```{r shortlog, eval=FALSE}
+fs::file_move(path = "downloads/ggplot2/author_summary.txt", 
+              # move to this 
+              new_path = paste0("data/", 
+                                base::noquote(lubridate::today()), 
+                                "-author_summary.txt"))
+```
+
+Now we check the location of the new `-author_summary.txt`
+
+```{r}
+fs::dir_tree("data", recurse = FALSE)
+```
+
+We can create the author summary file as a text vector.
+
+```{r tday_date}
+tday_date <- as.character(lubridate::today())
+author_summary_file <- paste0("data/", 
+                              tday_date,
+                              "-author_summary.txt")
+author_summary_file
+```
+
+
+```{r import-AuthSummShortlogRaw}
+# fs::dir_ls("data", recurse = FALSE)
+AuthSummShortlogRaw <- readr::read_table2(file = author_summary_file,
+                                              col_names = c("no",
+                                                    "commit_count",
+                                                    "commit_author"))
+```
+
+Inspect the raw data
+
+```{r AuthSummShortlogRaw}
+AuthSummShortlogRaw %>% glimpse(78)
+```
+
+
+```{r wrangle-author-summary-data}
+# remove first column
+AuthSummShortlog <- dplyr::select(AuthSummShortlogRaw, -c("no"))
+# create factor 
+AuthSummShortlog <- AuthSummShortlog %>% 
+  dplyr::mutate(
+  commit_author = base::factor(commit_author))
+AuthSummShortlog %>% skimr::skim()
+```
+
+### How many authors are in this repo?
+
+```{r distinct-authors}
+AuthSummShortlog %>% 
+  distinct(commit_author) %>% 
+  base::nrow()
+```
+
+This means there are 200 authors in the author summary file.
+
+# Visualize file changes 
+
+Below we set a theme and check the number of changes by author.
+
+```{r set-theme}
+ggplot2::theme_set(hrbrthemes::theme_ipsum_tw(
+  base_size = 11,
+  strip_text_size = 12,
+  axis_title_size = 14,
+  plot_title_size = 17,
+  subtitle_size = 15,
+  base_family = "EnvyCodeR",
+  # "JosefinSans-LightItalic"
+  strip_text_family = "TitilliumWeb-Regular",
+  axis_title_family = "TitilliumWeb-Regular",
+  subtitle_family = "TitilliumWeb-Regular",
+  plot_title_family = "JosefinSans-Regular"
+))
+```
+
+Below I can plot the number of commits against the name of the author who made the changes. 
+
+```{r scatter-plot-labs}
+# define labs first!
+commit_count_labs <- ggplot2::labs(
+    y = "Number of commits",
+    x = "Name of author",
+    title = "Commits from git log",
+    subtitle = "ggplot2 files with > 75 changes",
+    caption = "from git log --format=format: --name-only") 
+AuthSummShortlog %>% 
+  dplyr::filter(commit_count > 50) %>%  
+  ggplot2::ggplot(aes(x = forcats::fct_reorder(.f = commit_author,
+                             .x = commit_count),
+             y = commit_count)) +
+  ggplot2::geom_point() + 
+  ggplot2::coord_flip() +
+  commit_count_labs
+```
+
+This shows one possible shortcoming, Hadley is listed in here twice (`Hadley` and `hadley`). We can follow the advice [here](https://simonharrer.wordpress.com/tag/git-shortlog/) or we can handle the issue with authors using different aliases (`Hadley` vs `hadley`) with a little wrangling. 
+
+```{r author-summary-visualize-02}
+AuthSummShortlog %>% 
+  dplyr::filter(commit_count > 50) %>% 
+  dplyr::mutate(author = case_when(
+    # find all Hadley names
+    stringr::str_detect(string = commit_author, 
+                                  pattern = "hadley|Hadley") ~ "Hadley Wickham",
+    TRUE ~ as.character(commit_author)),
+    # convert to factor
+                author = as.factor(author)) %>% 
+  # arrange descending 
+  dplyr::arrange(desc(author)) %>% 
+  # group by author
+  dplyr::group_by(author) %>% 
+  # sum the author commits
+  dplyr::summarize(commit_count = sum(commit_count, na.rm = TRUE)) %>% 
+  # reorder these by the count
+  ggplot2::ggplot(aes(x = forcats::fct_reorder(.f = author,
+                    .x = commit_count),
+             y = commit_count)) +
+  ggplot2::geom_point() + 
+  ggplot2::coord_flip() + 
+  commit_count_labs
+```
+
+Now we can export these data for future use.
+
+```{r export-AuthSummShortlog}
+readr::write_csv(as.data.frame(AuthSummShortlog), 
+                 path = paste0("data/", 
+                         base::noquote(lubridate::today()), 
+                           "-AuthSummShortlog.csv"))
+fs::dir_tree("data", regex = "-AuthSummShortlog.csv")
+```
+
+

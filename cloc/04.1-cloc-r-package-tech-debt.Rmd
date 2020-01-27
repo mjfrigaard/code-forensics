@@ -1,0 +1,688 @@
+---
+title:  "Canary project - the `cloc` R package for assessing tech debt"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+library(rmdformats)
+require(tidyverse)
+library(plotly)
+require(janitor)
+require(skimr)
+library(mosaic)
+library(inspectdf)
+library(visdat)
+library(DT)
+library(formatR)
+library(hrbrthemes)
+library(gcookbook)
+library(stringi)
+library(ggbeeswarm)
+## Global options
+options(max.print = "75")
+# knitr chunk options ----
+knitr::opts_chunk$set(
+  echo = TRUE, # show/hide all code
+  # results = "hide", # hide results
+  tidy = FALSE, # cleaner code printing
+  comment = "#> ", # better console printing
+  eval = TRUE, # turn this to FALSE stop code chunks from running
+  message = TRUE, # show messages
+  fig.width = 9, # figure width
+  fig.height = 6, # figure height
+  warning = FALSE, # show warnings
+  size = "small", # size of the text
+  fig.path = "figs/"
+) # location of files
+# knit settings ----
+knitr::opts_knit$set(
+  width = 78
+)
+# base options ----
+base::options(
+  tibble.print_max = 25,
+  tibble.width = 78,
+  scipen = 100000000,
+  max.print = 999999
+)
+opts_knit$set(width = 75)
+```
+
+Check out the repository for this project [here](https://github.com/mjfrigaard/tech-debt-git-project).
+
+## Part 4: The `cloc` R package for analyzing lines of code 
+
+`cloc` is an R package for analyzing lines of code (it literally stands for *counting lines of code* ). We will be using it to analyze the code files in the popular `tidyverse` package, `dplyr`.  
+
+Below we will install and load the package into the R workspace (it's not on CRAN).
+
+```{r cloc-package, message=FALSE, warning=FALSE}
+# The `cloc` R package is not on CRAN
+# devtools::install_github("hrbrmstr/cloc")
+library(cloc)
+```
+
+We can check the package version to make sure we're up to speed here. 
+
+```{r packageVersion}
+utils::packageVersion("cloc")
+```
+
+The basic usage on the [`README.md` covers a lot of the functions in `cloc`](https://github.com/AlDanial/cloc), but we some specific questions about the data we can get out of a repository (and how it can be joined to the data we're extracting from the `git log`).
+
+## Looming questions about code...
+
+1. How can we connect the insights from the code files (complexity, promiscuous code, work done, etc.) to the users git data, and group these two sets of metrics by the project they're working on?
+
+2. How do the workflow practices and management strategies (i.e. who is working on what projects, how are they managing their time/work, and what files are they working on, and which files are getting attention from multiple development). We can also look at change coupling (files that are always changed together), and what kinds dependencies are built into the development process? If file dependencies (change coupling) is rampant, there is a higher risk of bugs and possibly poor organizational standards. 
+
+The functions in the `cloc` R package are below: 
+
+- `cloc`:	Count lines of code, comments and white space in source files/archives
+
+- `cloc_by_file`:	Count lines of code, comments and white space in source files/archives by file
+
+- `cloc_cran`:	Count lines of code (etc) from source packages on CRAN
+
+- `cloc_git`:	Count lines of code, comments and white space in a git tree
+
+- `cloc_remove_comments`:	Strip comments and white space from a single source file
+
+- `cloc_recognized_languages`:	Return a data frame of 'cloc' recognized languages and associated extensions
+
+- `cloc_call`:	Call 'cloc.pl' directly with granular control over options
+
+- `clock_pkg_md` : Run `cloc_pkg()` on active package and format it as a markdown table for knitting into reports
+
+- `cloc_help`:	See the command-line help 
+
+- `cloc_version`:	Retrieve the version of the embedded perl script
+
+- `cloc_os`:	Ask the embedded perl script to detect the OS type
+
+## Example repo: `dplyr`
+
+In this document, we're going to be using the `dplyr` package from RStudio's `tidyverse`.
+
+The following commands should be entered into your Terminal if you want to follow along. 
+
+```bash
+cd ..
+# pwd
+git clone https://github.com/tidyverse/dplyr.git
+```
+
+For completeness, the folder structure for this file (and overall project) is below. 
+
+```{r parent-folder-tree}
+fs::dir_tree("..", recurse = FALSE)
+```
+
+We are in the `tech-debt-git-project` folder, in the `04-r-packages-4-tech-debt.Rmd` file.
+
+```{r dir-tree-tech-debt-git-project}
+fs::dir_tree("../tech-debt-git-project", recurse = FALSE)
+```
+
+## Count the lines of code
+
+We will start with the basic usage similar to the overview in the [README.md document](https://github.com/hrbrmstr/cloc/blob/master/README.md). The basics of how this works is outlined in the steps below:
+
+For each of these files:
+
+1. Read the entire file into memory.
+
+2. Count the number of lines (= `Loriginal`).
+
+3. Remove blank lines, then count again (= `Lnon_blank`).
+
+4. Loop over the comment filters defined for this language. (For example, C++ has two filters: 
+
+  1) remove lines that start with optional white space followed by `//` and 
+  
+  2) remove text between `/*` and `*/`) Apply each filter to the code to remove comments. Count the left over lines (= `Lcode`).
+
+5. Save the counts for this language:
+
+  `blank lines` = `Loriginal` - `Lnon_blank` 
+  
+  `comment lines` = `Lnon_blank` - `Lcode`
+  
+  `code lines` = `Lcode`
+
+```{r ShinyCloc}
+# get path to file 
+# fs::dir_ls(path = "..", regexp = "shiny")
+file_path_shiny <- "../shiny"
+ShinyCloc <- cloc(source = file_path_shiny)
+```
+
+The returned table (`ShinyCloc`) includes the following variables:  
+
+```{r ShinyCloc-1-5}
+ShinyCloc[ , c(1:5)]
+```
+
+```{r ShinyCloc-6-10}
+ShinyCloc[ , c(6:10)]
+```
+
+A description of each variable is provided below:
+
+`source` = the name of the repo or directory
+
+`language` = the languages in the files 
+
+`file_count` = the corresponding number of files for each language 
+
+`file_count_pct` = the percentage of file count
+
+`loc` = lines of code 
+
+`loc_pct` = percentage lines of code 
+
+`blank_lines` = number of blank lines
+
+`blank_line_pct` = percentage of blank lines 
+
+`comment_lines` = number of comment lines 
+
+`comment_line_pct` = percentage of comment lines 
+
+Next up we have the `cloc` by specific file. We will use this on the `../shiny/R/app.R` file
+
+```{r AppFileCloc}
+# fs::dir_ls("../shiny/R")
+AppFileCloc <- cloc::cloc(source = "../shiny/R/app.R")
+```
+
+And as we can see, this has the same variables as the table above.
+
+```{r AppFileCloc-1-5}
+AppFileCloc[ , c(1:5)]
+```
+
+```{r AppFileCloc-6-10}
+AppFileCloc[ , c(6:10)]
+```
+
+## The `cloc::cloc_cran()` function
+
+If we're interested in a specific package from CRAN, we can use the `cloc::cloc_cran()`
+
+```{r Ggplot2ClocRaw, echo=TRUE}
+repo_url <- utils::contrib.url(repos = "https://cran.rstudio.com")
+Ggplot2ClocRaw <- cloc::cloc_cran(pkgs = "ggplot2", 
+                                  repo_url,
+                                  .progress = FALSE)
+```
+
+```{r Ggplot2ClocRaw-export-import, echo=FALSE,}
+# export
+readr::write_csv(as.data.frame(Ggplot2ClocRaw), path =
+                   paste0("data/",
+                          base::noquote(lubridate::today()),
+                          "-Ggplot2ClocRaw.csv"))
+# verify
+fs::dir_tree("data", regex = "-Ggplot2ClocRaw.csv")
+```
+
+```{r import-Ggplot2Cloc}
+Ggplot2Cloc <- readr::read_csv("data/2019-10-09-Ggplot2ClocRaw.csv")
+```
+
+```{r Ggplot2Cloc-1-5}
+Ggplot2Cloc %>% head(10)
+```
+
+```{r Ggplot2Cloc-6-10}
+Ggplot2Cloc %>% tail(10)
+```
+
+This is handy if we want to check the lines of code for a file in the CRAN repo vs. the files in a Github repo.
+
+## Lines of code (results by file)
+
+The `cloc::cloc_by_file()` option lets us look at the statistics by file, which is helpful for identifying hotspots and complexity. Both of these metrics are covered in the `SDX` text. Below we use this on the `shiny` package repo. 
+
+```{r create-ShinyClocByFile}
+ShinyClocByFileRaw <- cloc_by_file(source = "../shiny")
+```
+
+We can see this gives us much more granular data. 
+
+```{r ShinyClocByFile-glimpse}
+ShinyClocByFileRaw %>% glimpse(78)
+```
+
+So, if we were interested in the number of comment lines by file, we can `arrange` this file by `comment_lines` and create a Cleveland dot plot. 
+
+```{r set-theme, message=FALSE, warning=FALSE}
+ggplot2::theme_set(hrbrthemes::theme_ipsum_tw(base_size = 8,
+                                              axis_title_size = 9,
+                                              plot_title_size = 11,
+                                              axis_text_size = 8,
+                                              subtitle_size = 10,
+  # fonts 
+  plot_title_family = "TitilliumWeb-Regular",
+  subtitle_family = "Envy Code R Italic",
+  axis_title_family = "UbuntuCondensed-Regular",
+  base_family = "UbuntuCondensed-Regular"))
+```
+
+### Visualizing comments lines by file
+
+The plot below gives us the number of comment lines arranged by the file name. 
+
+```{r plot_ShinyClocByFileComments}
+# define labs first!
+comment_lines_labs <- ggplot2::labs(
+    y = "Number of comment lines",
+    x = "Name of file",
+    title = "shiny Comment Lines by File Name",
+    subtitle = "shiny files with more than 75 comments",
+    caption = "cloc::cloc_by_file(source = '../shiny')") 
+# look at the comment lines
+plot_ShinyClocByFileComments <- ShinyClocByFileRaw %>% 
+  dplyr::filter(comment_lines > 75) %>%  
+  ggplot(aes(x = fct_reorder(.f = filename,
+                             .x = comment_lines),
+             y = comment_lines)) +
+  geom_point() + 
+  coord_flip() +
+  comment_lines_labs
+plot_ShinyClocByFileComments
+```
+
+This plot still has the entire file path, but we will wrangle this to create two new variables (`file_path` and `file_name`).
+
+```{r ShinyClocByFile}
+ShinyClocByFile <- ShinyClocByFileRaw %>% 
+  dplyr::mutate(file_name = base::basename(filename)) %>% 
+  dplyr::rename(file_path = filename) %>% 
+  # reorganize this data frame
+  dplyr::select(source, # name of repo
+                dplyr::starts_with("file"), # this gets file path and name
+                language, # language in the file
+                loc, # total lines of code 
+                dplyr::ends_with("lines"), # blanks and comments
+                dplyr::everything()) # anything we forgot
+ShinyClocByFile %>% head(10)
+```
+
+Now when we plot the number of comment lines again, we can see the file name as opposed to the entire path. 
+
+```{r plot_ShinyClocByFileNameComments}
+plot_ShinyClocByFileNameComments <- ShinyClocByFile %>% 
+  dplyr::filter(comment_lines > 75) %>%  
+  ggplot(aes(x = fct_reorder(.f = file_name,
+                             .x = comment_lines),
+             y = comment_lines)) +
+  geom_point() + 
+  coord_flip() +
+  comment_lines_labs
+plot_ShinyClocByFileNameComments
+```
+
+That is much cleaner.
+
+### Visualizing blank lines by file
+
+We can also extend this to the blank lines in the repo, too. 
+
+```{r plot_ShinyClocByFileBlanks}
+# define labs first!
+blank_lines_labs <- ggplot2::labs(
+    y = "Number of blank lines",
+    x = "Name of file",
+    title = "shiny blank lines of code by file name",
+    subtitle = "files with > 75 blank lines",
+    caption = "cloc::cloc_by_file(source = '../shiny')") 
+# look at the comment lines
+plot_ShinyClocByFileBlanks <- ShinyClocByFile %>% 
+  dplyr::filter(blank_lines > 75) %>%  
+  ggplot(aes(x = fct_reorder(.f = file_name,
+                             .x = blank_lines),
+             y = blank_lines)) +
+  geom_point() + 
+  coord_flip() +
+  blank_lines_labs
+plot_ShinyClocByFileBlanks
+```
+
+The `jquery-ui.js` file has the highest number of blank lines in the `shiny` package. We can also see the `shiny.js` file has the fourth highest number of blank lines (recall that `shiny.js` also has the fourth highest number of `comment_lines`).
+
+## Creating a file extension variable
+
+Let's create a variable for the file extension (`file_ext`). This uses a regex from stackoverflow [here](http://bit.ly/2kg0QwJ).
+
+`\\.`        = match a literal dot
+
+`[^.]+`      = match 1 or more of any character but dot
+
+`(\\.[^.]+)` = capture above test in group #1
+
+`$`          = anchor to match end of input
+
+```{r file_ext-test}
+# # create some false file names
+test_files <- c("file.Rmd",
+                "bad.name.file.Rmd",
+                "another_file.R",
+                "plain_text.txt")
+# test this new regex
+stringr::str_view(string = test_files,
+                  pattern = "(\\.[^.]+)$")
+```
+
+```{r file-ext}
+ShinyClocByFile <- ShinyClocByFile %>% 
+  dplyr::mutate(file_ext = stringi::stri_extract_last(str = file_name, 
+                                                      regex = "(\\.[^.]+)$"))
+                # file_ext = str_to_lower(file_ext),
+# check this new variable
+ShinyClocByFile %>% 
+  dplyr::count(file_ext, sort = TRUE)
+```
+
+Here we see there is a little hiccup with the `.R` file extension. We can change this below:
+
+`.R|.r` = match .r or .R in file name  
+
+`(.R|.r)` = match above in group 1. 
+
+`$` = anchor to match end of input 
+
+```{r fix-file_ext}
+ShinyClocByFile <- ShinyClocByFile %>% 
+  dplyr::mutate(file_ext = case_when(
+    stringr::str_detect(string = file_name, pattern = "(.R|.r)$") ~ ".R",
+    TRUE ~ file_ext))
+ShinyClocByFile %>% 
+  dplyr::count(file_ext, sort = TRUE)
+```
+
+### Average Number of Comment and Blank Lines 
+
+Now we can re-plot these metrics using the new file extensions variable, and present only the summary statistics in the plot. 
+
+```{r plot_ShinyClocByFileBlanksFacet}
+# define labs first!
+avg_blank_lines_labs <- ggplot2::labs(
+    y = "Number of Blank Lines",
+    x = "Name of File Extension",
+    title = "shiny package: Average Number of Blank Lines of Code by File Name",
+    subtitle = "Files with > 75 Blank Lines",
+    caption = "cloc::cloc_by_file(source = '../shiny')") 
+avg_comment_lines_labs <- ggplot2::labs(
+    y = "Number of Comment Lines",
+    x = "Name of File Extension",
+    title = "shiny package: Average Number of Comment Lines of Code by File Name",
+    subtitle = "Files with > 75 Comment Lines",
+    caption = "cloc::cloc_by_file(source = '../shiny')") 
+
+# look at the blank lines
+plot_ShinyClocByFileAvgBlanks <- ShinyClocByFile %>%
+  dplyr::group_by(file_ext) %>% 
+  summarize(`mean blank lines` = mean(blank_lines)) %>% 
+  ggplot2::ggplot(aes(x = fct_reorder(.f = file_ext,
+                             .x = `mean blank lines`),
+             y = `mean blank lines`)) +
+  ggplot2::geom_point() + 
+  ggplot2::coord_flip() +
+  avg_blank_lines_labs
+
+plot_ShinyClocByFileAvgComments <- ShinyClocByFile %>%
+  dplyr::group_by(file_ext) %>% 
+  summarize(`mean comment lines` = mean(comment_lines)) %>% 
+  ggplot2::ggplot(aes(x = fct_reorder(.f = file_ext,
+                             .x = `mean comment lines`),
+             y = `mean comment lines`)) +
+  ggplot2::geom_point() + 
+  ggplot2::coord_flip() +
+  avg_comment_lines_labs
+```
+
+### Average number of blank lines by file extension
+
+The average numnber of blank lines per file extension is in the dot plot below.
+
+```{r plot_ShinyClocByFileAvgBlanks}
+plot_ShinyClocByFileAvgBlanks
+```
+
+### Average number of commnet lines (by file extention)
+
+And the average number of commment lines per file is below.
+
+```{r plot_ShinyClocByFileAvgComments}
+plot_ShinyClocByFileAvgComments
+```
+
+This shows the mean number of blank lines are highest in the CSS files (`.css`), but the highest number of comment lines are in the R files (`.R`). The problem is the mean might be misleading. We'll look at the distributions by file extension. 
+
+### Distribution of blank lines by files
+
+This is a bee-swarm plot of the distribution of blank lines according to their file type. 
+
+```{r plot_ShinyClocByFileBeeSwarmBlank}
+# blank lines labels 
+bee_blank_lines_labs <- ggplot2::labs(
+    x = "Number of Blank Lines",
+    y = "Name of File Extension",
+    title = "shiny: Distribution of Blank Lines of Code by File Extension",
+    caption = "cloc::cloc_by_file(source = '../shiny')") 
+plot_ShinyClocByFileBeeSwarmBlank <- ShinyClocByFile %>% 
+  
+  ggplot2::ggplot(aes(y = fct_reorder(.f = file_ext,
+                             .x = blank_lines),
+                       x = blank_lines)) + 
+  
+  ggbeeswarm::geom_quasirandom(aes(color = file_ext), 
+                            
+                            alpha = 0.5,
+                            size = 0.65, 
+                            groupOnX = FALSE,
+                            varwidth = TRUE) + 
+  
+  bee_blank_lines_labs
+plot_ShinyClocByFileBeeSwarmBlank
+```
+
+### Blank lines by file name and extension
+
+As we can see, there are a lot of blank lines in the CSS files. If we narrow down the data to only those files with more than 50 blank lines, we can plot the names of the files and look at where these differences are.
+
+```{r plot_ShinyClocByFileBlankFacet}
+# define labs first!
+blank_lines_labs <- ggplot2::labs(
+    y = "Number of Blank Lines",
+    x = "Name of File Extension",
+    title = "shiny: Blank Lines of Code by File Name and Extension",
+    subtitle = "Files with > 50 blank lines",
+    caption = "cloc::cloc_by_file(source = '../shiny')") 
+# look at the blank lines
+plot_ShinyClocByFileBlankFacet <- ShinyClocByFile %>% 
+  dplyr::filter(blank_lines > 50) %>%
+  ggplot2::ggplot(aes(x = fct_reorder(.f = file_name,
+                             .x = blank_lines),
+             y = blank_lines)) +
+  ggplot2::geom_point(aes(color = file_ext), 
+                      show.legend = FALSE) + 
+  ggplot2::coord_flip() + 
+  ggplot2::facet_wrap(. ~ file_ext, 
+                      nrow = 3, 
+                      scales = "free") +
+  blank_lines_labs
+plot_ShinyClocByFileBlankFacet
+```
+
+There is really one CSS file (`all.css`) driving up the mean number blanks. The R files are relatively are the lowest (`~ 250` lines), 
+
+### Distribution of comment lines by file extension
+
+If we repeat this process for the comment lines, we can see there are only a few `.R` files driving the skewness of that distribution. 
+
+```{r histogram-by-file-extension}
+ShinyClocByFile %>% 
+  dplyr::filter(comment_lines != 0) %>% 
+  ggplot2::ggplot(aes(x = comment_lines, color = file_ext)) + 
+  ggplot2::geom_freqpoly(bins = 30, show.legend = FALSE) + 
+  ggplot2::facet_wrap(. ~ file_ext, 
+                      scales = "free")
+```
+
+The distributions for the `.js`, `.R` and `.css` files are less skewed when we compare it to the `.html`, `.sh`, and `.yml` files. 
+
+```{r plot_ShinyClocByFileBeeSwarmComment}
+# blank lines labels 
+bee_comment_lines_labs <- ggplot2::labs(
+    x = "Number of Comment Lines",
+    y = "Name of File Extension",
+    title = "shiny: Distribution of Comment Lines of Code by File Extension",
+    caption = "cloc::cloc_by_file(source = '../shiny')") 
+# build plot for comments
+plot_ShinyClocByFileBeeSwarmComment <- ShinyClocByFile %>% 
+  
+  ggplot2::ggplot(aes(y = fct_reorder(.f = file_ext,
+                             .x = comment_lines),
+                       x = comment_lines)) + 
+  
+  ggbeeswarm::geom_quasirandom(aes(color = file_ext), 
+                            
+                            alpha = 0.5,
+                            size = 0.65, 
+                            groupOnX = FALSE,
+                            varwidth = TRUE) + 
+  
+  bee_comment_lines_labs
+plot_ShinyClocByFileBeeSwarmComment
+```
+
+### Commnet lines by file name and extension
+
+When we limit the comment lines to greater than `100` we see that the distribution is being driven up by the `jquery-ui.js` file (>`2000` lines of comments). `reactives.R` is the next highest at ~`1300` comment lines.
+
+```{r plot_ShinyClocByFileCommentFacet}
+# define labs first!
+comment_lines_labs <- ggplot2::labs(
+    y = "Number of Comment Lines",
+    x = "Name of File Extension",
+    title = "shiny: Comment Lines by File Name and Extension",
+    subtitle = "Files with > 200 comment lines",
+    caption = "cloc::cloc_by_file(source = '../shiny')") 
+# look at the comment lines
+plot_ShinyClocByFileCommentFacet <- ShinyClocByFile %>% 
+  dplyr::filter(comment_lines > 200) %>%
+  ggplot2::ggplot(aes(x = fct_reorder(.f = file_name,
+                             .x = comment_lines),
+             y = comment_lines)) +
+  ggplot2::geom_point(aes(color = file_ext), 
+                      show.legend = FALSE) + 
+  ggplot2::coord_flip() + 
+  ggplot2::facet_wrap(. ~ file_ext, 
+                      nrow = 3, 
+                      scales = "free") +
+  comment_lines_labs
+plot_ShinyClocByFileCommentFacet
+```
+
+This graph shows the number of comment lines is highest in the `.R` files (particularly in `manip.r`). The `.Rmd` files have a narrow range of comments (~`50` - ~`350`) range of comment lines, and they are all pretty evenly dispersed. 
+
+## Comments and blank lines (mean and median)
+
+Below is a `mean` and `max` plot for the comment lines and blank lines per file extension. 
+
+```{r ShinyClocByFileSum}
+ShinyClocByFileBlankSumTidy <- ShinyClocByFile %>%
+  dplyr::group_by(file_ext) %>% 
+  dplyr::summarize(
+            `median blank lines` = median(blank_lines),
+            `mean blank lines` = mean(blank_lines)) %>% 
+  tidyr::gather(key = "stat", 
+                value = "value",
+                -file_ext)
+# ShinyClocByFileBlankSumTidy
+ShinyClocByFileCommentSumTidy <- ShinyClocByFile %>%
+  dplyr::group_by(file_ext) %>% 
+  dplyr::summarize(`median comment lines` = median(comment_lines),
+            `mean comment lines` = mean(comment_lines)) %>% 
+    tidyr::gather(key = "stat", 
+                value = "value",
+                -file_ext)
+# ShinyClocByFileCommentSumTidy
+ShinyClocByFileSumTidy <- dplyr::bind_rows(ShinyClocByFileBlankSumTidy, 
+                                           ShinyClocByFileCommentSumTidy,
+                                           .id = "code_id")
+ShinyClocByFileSumTidy <- ShinyClocByFileSumTidy %>% 
+  dplyr::mutate(code_id = case_when(
+    code_id == 1 ~ "Blank Lines",
+    code_id == 2 ~ "Comment Lines"
+  ))
+```
+
+```{r mean-vs-median-plot}
+# define labs first! 
+mean_median_comment_blanks_labs <- ggplot2::labs(
+  title = "shiny: Comment lines and blank lines of codes",
+  subtitle = "Measures of central tendency (Mean amd Median)",
+  x = "Lines in code file",
+  y = "File extensions")
+ShinyClocByFileSumTidy %>% 
+  ggplot2::ggplot(aes(y = file_ext,
+                      x = value,
+                      group = stat)) +
+  ggplot2::geom_point(aes(color = stat), 
+                      size = 2, 
+                      alpha = 0.5,
+                      show.legend = FALSE) + 
+  ggplot2::facet_wrap(. ~ code_id, scales = "free_y") + 
+  ggrepel::geom_text_repel(
+    data = ShinyClocByFileSumTidy, 
+                           aes(label = stat),
+    # size of text
+    size = 2.1,
+    # opacity of the text
+    alpha = 8 / 10,
+    # in case there is overplotting
+    arrow = arrow(
+      length = unit(0.02, "inches"),
+      type = "open",
+      ends = "last"
+    ),
+    show.legend = FALSE) + 
+  
+  mean_median_comment_blanks_labs
+```
+
+
+## Export these data 
+
+Export these data files with a time stamp
+
+```{r export-GgplotGitClocData}
+# list files
+# ShinyClocByFileRaw
+readr::write_csv(as.data.frame(ShinyClocByFileRaw), 
+                 path = paste0("data/",
+                               base::noquote(lubridate::today()), 
+                                "-04-ShinyClocByFileRaw.csv"))
+# ShinyClocByFile
+readr::write_csv(as.data.frame(ShinyClocByFile), 
+                 path = paste0("data/",
+                               base::noquote(lubridate::today()), 
+                                "-04-ShinyClocByFile.csv"))
+# Ggplot2Cloc
+readr::write_csv(as.data.frame(Ggplot2Cloc), 
+                 path = paste0("data/",
+                               base::noquote(lubridate::today()), 
+                                "-04-Ggplot2Cloc.csv"))
+# ShinyCloc
+readr::write_csv(as.data.frame(ShinyCloc), 
+                 path = paste0("data/",
+                               base::noquote(lubridate::today()), 
+                                "-04-ShinyCloc.csv"))
+# verify
+fs::dir_tree("data", regex = "(-04-)|(Cloc)")
+```

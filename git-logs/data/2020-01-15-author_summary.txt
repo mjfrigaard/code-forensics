@@ -1,0 +1,241 @@
+   1   2343	hadley
+   1    653	Winston Chang
+   1    134	Hadley Wickham
+   1    133	Thomas Lin Pedersen
+   1    103	Kohske Takahashi @ jurina
+   1     70	Kohske Takahashi at Haruna
+   1     69	hadley wickham
+   1     67	Claus Wilke
+   1     63	Jean-Olivier Irisson
+   1     60	Hiroaki Yutani
+   1     57	Lionel Henry
+   1     50	Dewey Dunnington
+   1     48	Kara Woo
+   1     43	Kirill Müller
+   1     30	Kohske Takahashi @ ayaka
+   1     27	Brian Diggs
+   1     21	Mara Averick
+   1     20	Jake Russ
+   1     17	joran
+   1     17	Kohske Takahashi @ Yukarin
+   1     17	Dana Paige Seidel
+   1     14	Josef Fruehwald
+   1     12	DanRuderman
+   1     11	Jim Hester
+   1     10	Hassan Kibirige
+   1      9	thomasp85
+   1      9	Thomas Dybdal Pedersen
+   1      9	Kohske Takahashi @ Yukarin GitHub for Mac
+   1      9	Bob Rudis
+   1      7	koneill
+   1      7	Max Kuhn
+   1      5	boB Rudis
+   1      5	Victor Lei
+   1      5	Toby Dylan Hocking
+   1      5	Tmshn
+   1      5	Patrick Kennedy
+   1      5	Noam Ross
+   1      4	richierocks
+   1      4	hrbrmstr
+   1      4	bernie gray
+   1      4	baptiste auguie
+   1      4	Willem Ligtenberg
+   1      4	Sven E. Templer
+   1      4	Sebastian Kopf
+   1      4	Mine Cetinkaya-Rundel
+   1      4	Joran Elias
+   1      4	Jeffrey Arnold
+   1      4	Dennis Murphy
+   1      4	David Morrison
+   1      4	Anton Antonov
+   1      3	veraanadi
+   1      3	unknown
+   1      3	microly
+   1      3	markpayneatwork
+   1      3	kohske takahashi
+   1      3	david kahle
+   1      3	Sean Hughes
+   1      3	Richard J Cotton
+   1      3	Nick Kennedy
+   1      3	Munish Goyal
+   1      3	Katiedaisey
+   1      3	Jason Daniel Augustine Gilliland
+   1      3	Jan Schulz
+   1      3	Greg
+   1      3	Edzer Pebesma
+   1      2	lindbrook
+   1      2	bbolker
+   1      2	Zhuoer Dong
+   1      2	Will Beasley
+   1      2	Tomas Sieger
+   1      2	Steve Haroz
+   1      2	Sean Carmody
+   1      2	Mikko Korpela
+   1      2	Martin Suchanek
+   1      2	Malcolm Barrett
+   1      2	Luke W Johnston
+   1      2	Kevin Ushey
+   1      2	Katrin Leinweber
+   1      2	Kamil Slowikowski
+   1      2	Joris Falip
+   1      2	Jonathan Carroll
+   1      2	Jeff Arnold
+   1      2	Ioannis Kosmidis
+   1      2	Edward Visel
+   1      2	Dylan Stark
+   1      2	Didzis Elferts
+   1      2	Dean Attali
+   1      2	David J. Harris
+   1      2	Daniel Barnett
+   1      2	Dale Maschette
+   1      2	Connor Lewis
+   1      2	Chris Black
+   1      2	Cathy
+   1      2	Cary Reams
+   1      2	Carson Sievert
+   1      2	Brent Brewington
+   1      2	Benjamin Reisman
+   1      2	Barret Schloerke
+   1      2	Anne Lyngholm
+   1      2	Anne Helby Petersen
+   1      2	Ahobert
+   1      1	yutannihilation
+   1      1	tomschloss
+   1      1	timgoodman
+   1      1	stefanedwards
+   1      1	pbiecek
+   1      1	pank
+   1      1	mitchelloharawild
+   1      1	mikefc
+   1      1	metanoid
+   1      1	lehy
+   1      1	jrnold
+   1      1	heckendorfc
+   1      1	eliocamp
+   1      1	coolbutuseless
+   1      1	buyske
+   1      1	beckymaust
+   1      1	baptiste
+   1      1	atusy
+   1      1	arilamstein
+   1      1	andrasberczi
+   1      1	Zach Burchill
+   1      1	Yihui Xie
+   1      1	Wouter van der Bijl
+   1      1	Winston
+   1      1	Viole
+   1      1	Tristan Jay Mahr
+   1      1	Travis McArthur
+   1      1	Tom H
+   1      1	Thomas Klebel
+   1      1	Thomas Grenfell Smith
+   1      1	Thiyanga  Talagala
+   1      1	Thieffen
+   1      1	Thell 'Bo' Fowler
+   1      1	Teun van den Brand
+   1      1	Tal Galili
+   1      1	TJ Mahr
+   1      1	Suthira
+   1      1	Stéphane Guillou
+   1      1	Steve Lianoglou
+   1      1	StefanBRas
+   1      1	Sina Rüeger
+   1      1	Shyam Saladi
+   1      1	Shelmith
+   1      1	Seth Wenchel
+   1      1	Ryan Curtin
+   1      1	Ryan C. Thompson
+   1      1	RobertZK
+   1      1	Rick Saporta
+   1      1	Richard M. Smith
+   1      1	Richard James Acton
+   1      1	Rasmus Bååth
+   1      1	Priyanga Dilini Talagala
+   1      1	Pierre Formont
+   1      1	Philipp A
+   1      1	Peter Meilstrup
+   1      1	Peter Hickey
+   1      1	Pedro Perez
+   1      1	Pavel Panko
+   1      1	Paul Murrell
+   1      1	Paul J. McMurdie
+   1      1	NikNakk
+   1      1	Nick Solomon
+   1      1	Nicholas Tierney
+   1      1	Nate Teetor
+   1      1	Mitchell O'Hara-Wild
+   1      1	Mikko Marttila
+   1      1	Michael Bramson
+   1      1	Megan Beckett
+   1      1	Maxim Nazarov
+   1      1	Matthew Pancia
+   1      1	Matthew Berginski
+   1      1	Martin Rüßler
+   1      1	Martin Breuss
+   1      1	Marco Colombo
+   1      1	Mara Alexeev
+   1      1	Luke McGuinness
+   1      1	Lukas Burk
+   1      1	Luciano Selzer
+   1      1	Kevin Ferris
+   1      1	Kenny Darrell
+   1      1	Karsten Loesing
+   1      1	Karl Ove Hufthammer
+   1      1	Karl Broman
+   1      1	Justin Jent
+   1      1	Jun Cai
+   1      1	Joseph Stachelek
+   1      1	Jonathan Gilligan
+   1      1	Jonas Schöley
+   1      1	Joey Reid
+   1      1	Jeroen Ooms
+   1      1	Jennifer (Jenny) Bryan
+   1      1	JamesCuster
+   1      1	Ista Zahn
+   1      1	Hugo Gruson
+   1      1	HughParsonage
+   1      1	Hojjat Salmasian
+   1      1	Henrik-P
+   1      1	Hendrik Buschmeier
+   1      1	Heather
+   1      1	Hao Ye
+   1      1	Haley Jeppson
+   1      1	Gökçen Eraslan
+   1      1	Guangchuang Yu
+   1      1	Greg Macfarlane
+   1      1	Greg Fiumara
+   1      1	Frederik Tiedemann
+   1      1	Frank Erens
+   1      1	Elio Campitelli
+   1      1	Eli-Berkow
+   1      1	David Kretch
+   1      1	David Chavez
+   1      1	Dariya Sydykova
+   1      1	Dario Buttari
+   1      1	Daniel Wells
+   1      1	Daniel Mastropietro
+   1      1	Daniel Gromer
+   1      1	Dan Ruderman
+   1      1	Claire D. McWhite
+   1      1	Chuanxin
+   1      1	Christopher Roach
+   1      1	Christophe Dervieux
+   1      1	Chris Merkord
+   1      1	Chester Ismay
+   1      1	Charlotte Wickham
+   1      1	Brodie Gaslam
+   1      1	BrianDiggs
+   1      1	Brian W. Davis
+   1      1	Brian Danielak
+   1      1	Bernhard Konrad
+   1      1	Ari Lamstein
+   1      1	Antoine Filipovic Pierucci
+   1      1	Anthony Chiu
+   1      1	Angélica Custódio
+   1      1	Andrew Whitby
+   1      1	Andrew Dolman
+   1      1	Amy Yang
+   1      1	Alex Trueman
+   1      1	Alex Branham
+   1      1	Abraham Neuwirth
+   1      1	Aaron Schumacher

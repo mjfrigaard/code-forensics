@@ -1,0 +1,443 @@
+---
+title: "Aperture - Reproduce Simon Jackosn's Tidy Git analysis"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+library(rmdformats)
+require(tidyverse)
+library(plotly)
+require(janitor)
+require(skimr)
+library(gh)
+library(mosaic)
+library(inspectdf)
+library(visdat)
+library(DT)
+library(formatR)
+library(hrbrthemes)
+library(gcookbook)
+library(stringi)
+library(ggbeeswarm)
+library(listviewer)
+## Global options
+options(max.print = "75")
+# knitr chunk options ----
+knitr::opts_chunk$set(
+  echo = TRUE, # show/hide all code
+  # results = "hide", # hide results
+  tidy = FALSE, # cleaner code printing
+  comment = "#> ", # better console printing
+  eval = TRUE, # turn this to FALSE stop code chunks from running
+  message = TRUE, # show messages
+  fig.width = 9, # figure width
+  fig.height = 6, # figure height
+  warning = FALSE, # show warnings
+  size = "small", # size of the text
+  fig.path = "figs/"
+) # location of files
+# knit settings ----
+knitr::opts_knit$set(
+  width = 78
+)
+# base options ----
+base::options(
+  tibble.print_max = 25,
+  tibble.width = 78,
+  scipen = 100000000,
+  max.print = 999999
+)
+opts_knit$set(width = 75)
+ggplot2::theme_set(hrbrthemes::theme_ipsum_tw(
+  base_size = 10,
+  strip_text_size = 11,
+  axis_title_size = 13,
+  plot_title_size = 17,
+  subtitle_size = 13,
+  base_family = "EnvyCodeR",
+  # "JosefinSans-LightItalic"
+  strip_text_family = "TitilliumWeb-Regular",
+  axis_title_family = "TitilliumWeb-Regular",
+  subtitle_family = "TitilliumWeb-Regular",
+  plot_title_family = "JosefinSans-Regular"
+))
+```
+
+
+# Resources for analyzing code
+
+There are quite a few blogs and resources for analyzing Github data. This document is the first of two blog posts for analyzing Github data.
+
+1. [Guide to tidy git analysis](https://drsimonj.svbtle.com/embarking-on-a-tidy-git-analysis): this is a blog post that looks into the `dplyr` repository, but minimally. 
+
+2. Jenny Bryan from RStudio has an excellent repository for exploring Github data here: ["Examples of using `purrr` with gh to do things in bulk via GitHub API"](https://github.com/jennybc/purrr-gh-github-api-fun).
+
+First we load the `packages`. 
+
+```{r packages, message=FALSE, warning=FALSE}
+# Parts 1 and 2
+library(tidyverse)
+library(glue)
+library(stringr)
+library(forcats)
+
+# Part 3
+library(tidygraph)
+library(ggraph)
+library(tidytext)
+```
+
+The next few steps outlines putting a Github repo (essentially a url) into a text vector, then use this to clone the repo into a temporary directory (`temp`).
+
+```{r clone-repo}
+# Remote repository URL
+repo_url <- "https://github.com/tidyverse/dplyr.git"
+# Directory into which git repo will be cloned
+clone_dir <- file.path(tempdir(), "git_repo")
+clone_dir
+# Create command
+clone_cmd <- glue::glue("git clone {repo_url} {clone_dir}")
+clone_cmd
+# Invoke command
+# system(clone_cmd)
+```
+
+## `glue` stuff together
+
+Next we end up `glue`ing the commands together into a text string (`clone_cmd`). Finally we call it using the `system()` command. 
+
+Fortunately, we already have the `git` information and the repo downloaded in another folder. 
+
+```{r dplyr}
+fs::dir_tree(".", recurse = FALSE)
+```
+
+So we can rename `clone_dir` to `downloads/dplyr`.
+
+```{r clone_dir}
+clone_dir <- file.path("downloads", "dplyr")
+clone_dir
+```
+
+Then create a new set of commands which will clone the `tidyverse/dplyr.git` repo into `downloads/dplyr`
+
+```{r clone_cmd}
+# Create command
+clone_cmd <- glue::glue("git clone {repo_url} {clone_dir}")
+clone_cmd
+```
+
+And execute the command using `system()`.
+
+In order to get the history from the gitlog, we'll need to combine the `git` commands with the `glue` and `system` commands.
+
+```{r clone-into-local-dir}
+# Invoke command
+system(clone_cmd)
+```
+
+```{r dir_tree-dplyr}
+fs::dir_tree("downloads/dplyr", recurse = FALSE)
+```
+
+### The tidy git history
+
+We can use `glue` again to get the git log.
+
+```{r git-log}
+system(glue('git -C {clone_dir} log -3'))
+```
+
+The next few options clean up a git lot command so that we can include some options to clean up the output. 
+
+```{r log_format_options}
+log_format_options <- c(datetime = "cd", 
+                        commit = "h", 
+                        parents = "p", 
+                        author = "an", 
+                        subject = "s")
+log_format_options
+option_delim <- "\t"
+log_format <- glue("%{log_format_options}") %>% collapse(option_delim)
+log_format
+log_options  <- glue('--pretty=format:"{log_format}" --date=format:"%Y-%m-%d %H:%M:%S"')
+log_options
+log_cmd <- glue('git -C {clone_dir} log {log_options}')
+log_cmd
+```
+
+Now, this looks more like a git log command. 
+
+```{r log_cmd}
+log_cmd
+```
+
+Now we can take `log_cmd` and pass it to `system(glue('{log_cmd} -3'))`. 
+
+```{r system-log-cmd}
+system(glue('{log_cmd} -3'))
+```
+
+And here we have a tidy-ish output. In order to get this into a tidy data frame, we'll need some help from `stringr` and `tibble`. 
+
+```{r HistLogs}
+HistLogs <- base::system(command = log_cmd, 
+                         intern = TRUE) %>% 
+  # convert this to a tibble
+  tibble::as_tibble() %>% 
+  # split the value into necessary components
+  tidyr::separate(data = ., 
+                  col = value, 
+                  into = c("datetime", "commit", 
+                           "parents", "author", 
+                           "subject"), sep = "\t") %>% 
+  # split the date into date and time
+  tidyr::separate(data = .,
+                  col = datetime,
+                  into = c("date", "time"),
+                  sep = " ",
+                  remove = FALSE) %>%
+  # convert datetime to POSIXct
+  dplyr::mutate(date = lubridate::ymd_hms(datetime, tz = "UTC"),
+                # put parents in a list column
+                parents = stringr::str_split(string = parents, 
+                                             pattern = " "))
+HistLogs %>% head(10)
+```
+
+
+```{r branch-column}
+# Start with NA
+HistLogs <- HistLogs %>% dplyr::mutate(branch = NA_integer_)
+```
+
+```{r free_col}
+# Create a boolean vector to represent free columns (1000 should be plenty!)
+free_col <- rep(TRUE, 1000)
+free_col %>% head()
+```
+
+Now we introduce the `for` loop that creates a parent file
+
+```{r for-loop}
+for (i in seq_len(nrow(HistLogs) - 1)) { # - 1 to ignore root
+  
+  # Check current branch col and assign open col if NA
+  
+  branch <- HistLogs$branch[i]
+
+  if (is.na(branch)) {
+    branch <- which.max(x = free_col)
+    free_col[branch] <- FALSE
+    HistLogs$branch[i] <- branch
+  }
+
+  # Go through parents
+  parents <- HistLogs$parents[[i]]
+
+  for (p in parents) {
+    
+    parent_col <- HistLogs$branch[HistLogs$commit == p]
+
+    # If col is missing, assign it to same branch (if first parent) or new
+    # branch (if other)
+    
+    if (is.na(parent_col)) {
+      parent_col <- dplyr::if_else(condition = p == parents[1], 
+                            true = branch, 
+                            false = which.max(free_col))
+
+    # If NOT missing this means a split has occurred. Assign parent the lowest
+    # and re-open both cols (parent closed at the end)
+    
+    } else {
+      free_col[c(branch, parent_col)] <- TRUE
+      parent_col <- min(branch, parent_col)
+
+    }
+
+    # Close parent col and assign
+    
+    free_col[parent_col] <- FALSE
+    HistLogs$branch[HistLogs$commit == p] <- parent_col
+  }
+}
+```
+
+### Export the data frame
+
+Let's export this just to be safe. 
+
+```{r histlogs_out}
+histlogs_out <- outFile(file_path = "data", 
+                        file_name = "Histlogs", 
+                        file_extension = "rds")
+# export
+readr::write_rds(x = HistLogs, path = histlogs_out)
+# check
+fs::dir_tree(path = "data", regexp = "histlogs")
+# remove old files
+unlink(x = c("data/2019-10-09-174258-histlogs.rds",
+             "data/2019-10-09-182537-histlogs.rds",
+             "data/2019-10-09-191025-histlogs.rds"))
+```
+
+This shows 10 different levels of `branch`...and apparently level `1` is the root.
+
+```{r count-branch}
+HistLogs %>% count(branch)
+```
+
+But how do these relate to each other? My assumption is that the 
+
+```{r TenParentsBranches-NineParentsBranches}
+TenParentsBranches <- HistLogs %>% 
+  dplyr::filter(branch == 10) %>% 
+  dplyr::select(parents, branch)
+
+NineParentsBranches <- HistLogs %>% 
+  dplyr::filter(branch == 9) %>% 
+  dplyr::select(parents, branch)
+```
+
+This shows none of these have two `parent` commit ids.
+
+```{r TenParentsBranches}
+listviewer::jsonedit(listdata = TenParentsBranches)
+```
+
+We can see that even though there are observations with two commit tags. But if we check the elements in the `NineParentsBranches` tibble, we can see the two parent tags. 
+
+```{r check-an-example}
+NineParentsBranches$parents[[18]]
+```
+
+If we enter one of these into the search bar: `"f6e72376"`
+
+```{r NineParentsBranches}
+listviewer::jsonedit(listdata = NineParentsBranches)
+```
+
+We see the list contains one of the commit ids. 
+
+So it looks like the `for loop` put all the `parent` commits into a list-column so that commits with more than one would still be stored in the same place. 
+
+Back to the tutorial...
+
+## Count author
+
+This will count the authors, and we can see there is a problem of redundant names.
+
+```{r count-authors}
+HistLogs %>% 
+  count(author, sort = TRUE)
+```
+
+Next we do a little wrangling and see what the 
+
+```{r HistLogs-author}
+HistLogs <- HistLogs %>% 
+  mutate(author = case_when(
+    stringr::str_detect(
+      string = tolower(author), 
+         pattern = "hadley") ~ "Hadley Wickham",
+    stringr::str_detect(
+      string = tolower(author), 
+         pattern = "kohske takahashi") ~ "Kohske Takahashi",
+    TRUE ~ str_to_title(author)
+  ))
+# check
+HistLogs %>% count(author, sort = TRUE)
+```
+
+
+Plot the number of commits by author.
+
+```{r plot_number_of_commits}
+HistLogs %>% 
+  count(author) %>% 
+  top_n(10, n) %>% 
+  mutate(author = fct_reorder(author, n)) %>% 
+  ggplot(aes(author, n)) +
+    geom_col(aes(fill = n), show.legend = FALSE) +
+    coord_flip() +
+    labs(title = "dplyr authors with most commits", 
+         x = NULL,
+         y = "Number of commits")
+```
+
+```{r nodes-and-edges}
+# Convert commit to a factor (for ordering nodes)
+HistLogs <- HistLogs %>% 
+  dplyr::mutate(commit = factor(commit))
+
+# Nodes are the commits (keeping relevant info)
+HistNodes <- HistLogs %>% 
+  dplyr::select(-parents) %>% 
+  dplyr::arrange(commit)
+
+# Edges are connections between commits and their parents
+HistEdges <- HistLogs %>% 
+  dplyr::select(commit, parents) %>% 
+  tidyr::unnest(parents) %>% 
+  dplyr::mutate(parents = factor(parents, levels = levels(commit))) %>% 
+  dplyr::transmute(from = as.integer(parents), to = as.integer(commit)) %>% 
+  tidyr::drop_na()
+```
+
+Now we create the `GitGraphData` using `tbl_graph` from the [`tidygraph` package](https://www.data-imaginist.com/2017/introducing-tidygraph/).
+
+```{r GitGraphData}
+# Create tidy directed graph object
+GitGraphData <- tidygraph::tbl_graph(nodes = HistNodes, 
+                                     edges = HistEdges, 
+                                     directed = TRUE)
+GitGraphData
+```
+
+This creates the network graph from Thomas Lin Pedersen's [`tidygraph` package](https://www.data-imaginist.com/2017/introducing-tidygraph/), but I had to specify the `layout = "nicely"` to get the graph to look like the one in the post. 
+
+```{r tidy_graph_nicely}
+tidy_graph_nicely <- GitGraphData %>% 
+  ggraph::ggraph(layout = "nicely") +
+    geom_edge_link(alpha = .1) +
+    geom_node_point(aes(color = factor(branch)), alpha = .3) +
+    theme_graph() +
+    theme(legend.position = "none")
+tidy_graph_nicely
+```
+
+I will export this to the `figs` folder. 
+
+```{r save-tidy_graph_nicely.png}
+# save
+ggsave("figs/tidy_graph_nicely.png")
+```
+
+This looks great, but it utterly useless. We need to change a few layout options so we can create a network graph. The code below...
+
+> the tidy graph object, ensure the proper layout is used, and create the basic plot:
+
+```{r ggraph_git, error=TRUE}
+ggraph_git <- . %>%
+  # Set node x,y coordinates
+  activate(nodes) %>% 
+  dplyr::mutate(x = datetime, y = branch) %>% 
+  # Plot with correct layout
+  create_layout(layout = "manual", node.positions = as_tibble(activate(., nodes))) %>% 
+  {ggraph(., layout = "manual") + theme_graph() + labs(caption = "Post by @drsimonj")}
+# Using this pipeline:
+GitGraphData %>% 
+  ggraph_git() +
+    geom_edge_link(alpha = .1) +
+    geom_node_point(aes(color = factor(branch)), alpha = .3) +
+    theme(legend.position = "none") +
+    ggtitle("Commit history of dplyr")
+```
+
+This doesn't work...we can revisit this.
+
+
+
+

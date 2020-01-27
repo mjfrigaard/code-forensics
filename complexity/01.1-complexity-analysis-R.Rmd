@@ -1,0 +1,714 @@
+---
+title:  "Git Tech Debt - Complexity Calculates (Python 2x -> Python 3x)"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+library(rmdformats)
+require(tidyverse)
+library(plotly)
+require(janitor)
+require(skimr)
+library(mosaic)
+library(inspectdf)
+library(visdat)
+library(DT)
+library(formatR)
+library(hrbrthemes)
+library(gcookbook)
+library(stringi)
+library(ggbeeswarm)
+## Global options
+options(max.print = "75")
+# knitr chunk options ----
+knitr::opts_chunk$set(
+  echo = TRUE, # show/hide all code
+  # results = "hide", # hide results
+  tidy = FALSE, # cleaner code printing
+  comment = "#> ", # better console printing
+  eval = TRUE, # turn this to FALSE stop code chunks from running
+  message = TRUE, # show messages
+  fig.width = 9, # figure width
+  fig.height = 6, # figure height
+  warning = FALSE, # show warnings
+  size = "small", # size of the text
+  fig.path = "figs/"
+) # location of files
+# knit settings ----
+knitr::opts_knit$set(
+  width = 78
+)
+# base options ----
+base::options(
+  tibble.print_max = 25,
+  tibble.width = 78,
+  scipen = 100000000,
+  max.print = 999999
+)
+opts_knit$set(width = 75)
+```
+
+# Motivation
+
+We're going to be running quite a few Python scripts in RStudio, and most of these were originally written in Python 2. So we need to 1) be sure the code for Python 2 still runs, and 2) update this code so that it works in Python 3. We also want to check our work in R, so this means we'd like a computing environment that can handle all three tasks. Fortunately, RStudio has the [reticulate package](https://rstudio.github.io/reticulate/index.html) and [Rmarkdown](https://cran.r-project.org/web/packages/rmarkdown/index.html).
+
+## What we'll cover
+
+This file covers how to analyze complexity in a Git repository. The original Python code Tornhill wrote to analyze complexity were written in Python 2, but we will updated this code to 3x for future use. 
+
+There is a corresponding Jupyter Notebook for completing this analysis [here]().
+
+## Things to know before we start
+
+We've installed and updated [Homebrew](https://brew.sh/), and used it to install the latest version of [python with anaconda](https://medium.com/ayuth/install-anaconda-on-macos-with-homebrew-c94437d63a37). 
+
+When we check the version of anaconda in the Terminal window on this machine, we see the following. 
+
+```bash
+Last login: Tue Jan 14 14:09:46 on ttys000
+~ % conda --version
+conda 4.8.1
+~ % python --version
+Python 3.7.4
+~ % brew --version 
+Homebrew 2.2.2
+Homebrew/homebrew-core (git revision 145fe; last commit 2020-01-14)
+Homebrew/homebrew-cask (git revision abd8d7; last commit 2020-01-14)
+```
+
+This shows us that we'll need to set up another conda enviornment to run Python 2x in, and make sure we load whatever other libraries we'll need in this as well.
+
+# How to run Python (2x and 3x) in RStudio
+
+Don't let the name fool you, RStudio now has the ability to run Python. We're using some code from Python 2, so we will be 1) making sure that code runs properly, and 2) making sure we can update this code to Python 3. 
+
+## Install the `reticulate` package 
+
+The `reticulate` package allows Python code to be run inside RStudio at the console, and in `Rmd` files. 
+
+Install and load `reticulate` in the code chunk below. 
+
+```{r setup-reticulate}
+# install.packages("reticulate")
+library(reticulate)
+```
+
+### Command line tools
+
+Using `reticulate` means we get to use some tools from the command-line, so we'll be using RStudio's buil-in Terminal window quite a bit. Starting in macOS Calatina, the [default shell is `zsh`](https://support.apple.com/en-us/HT208050), so there might be some differences if you're using Linux or an older version of macOS.
+
+### Locating Python 
+
+After loading this library, we want to check the version of Python being used in RStudio. 
+
+```{r which-python}
+Sys.which("python")
+```
+
+Alternatively, if I run the following in a Bash code block
+
+```{bash}
+which python
+```
+
+Its the same thing. This is telling me where the folder for Python is located. 
+
+### Determine Python version
+
+Both file paths above are both pointing to the same place, which is the location of Python. We want to know how many versions of Python exist on this machine (we know the anaconda version has been installed, but macOS also ships with 2.7). I can check with `reticulate::py_discover_config()` (run this one in the Console pane).
+
+```{r py_discover_config}
+reticulate::py_discover_config()
+```
+
+So, this looks like I have python 3 installed in a `local` folder, and `python` installed in a local folder. 
+
+What if I check the version of Python in the Rmd file with `python --version`.
+
+```{bash}
+python --version
+```
+
+I see that this is version 2.7.17. How about if I check the same thing in the Terminal pane?
+
+```{r conda-env, echo=FALSE}
+# fs::dir_ls("figs")
+knitr::include_graphics(path = "figs/conda-env.png")
+```
+
+This is because macOS ships with 2.7 (read more [here](https://opensource.com/article/19/5/python-3-default-mac)), and we don't want to remove that version of Python. But we want to tell reticualte to use the python3 version.
+
+```{r use-python3}
+use_python("/usr/bin/python3")
+```
+
+Alternatively, we can create an alternative `conda` environment with Python 3.7 and then use this. First let's see if there are any environments on this machine with `reticulate::conda_list()`.
+
+```{r conda_list}
+reticulate::conda_list()
+```
+
+We can also check to see if there are any other environments (like `pip` or `pip3`) with `reticulate::virtualenv_list()`
+
+```{r virtualenv_list}
+reticulate::virtualenv_list()
+```
+
+Nothing. Great, we're starting with a clean slate. I will make a new `conda` environment for running Python 3.7 code. 
+
+## Creating `conda` environments in RStudio
+
+Now, we know the code stored in Tornhill's Python [scripts](https://github.com/adamtornhill/maat-scripts) is written in Python 2, so we will need to keep a `conda` environment for running those scripts in RStudio. 
+
+Creating new environments with `conda` is fairly straightforward with `reticulate::conda_install()`. If you have any questions that expand beyond the comments, please consult the documentation on the `conda` site [here.](https://conda.io/projects/conda/en/latest/user-guide/tasks/manage-environments.html).
+
+```{r conda_install}
+reticulate::conda_install(
+  envname = "r_py3",
+  packages = "python",
+  # forge = TRUE,
+  pip = FALSE,
+  # pip_ignore_installed = FALSE,
+  # conda = "auto",
+  python_version = 3.7
+)
+```
+
+Now we have a `conda` environment named `r_py3` and we've specified the version of python we'd like to use. Let's check our list of `conda` environments to see is the `r_py3` is listed. 
+
+```{r check-r_py3}
+reticulate::conda_list()
+```
+
+We can see this is now in the list of names and python paths. `r_py3` is also listed if we checked the `py_discover_config()` function again.
+
+```{r r_py3-py_discover_config}
+reticulate::py_discover_config()
+```
+
+### Using a `conda` environment 
+
+To use this new environment, use `reticulate::use_condaenv()` and specify the new environment we just created.
+
+```{r use-r_py3}
+reticulate::use_condaenv(condaenv = "r_py3")
+```
+
+## Run Python code in Rmarkdown chunk
+
+```{python}
+import pandas
+flights = pandas.read_csv("data/flights.csv")
+flights = flights[flights['dest'] == "ORD"]
+flights = flights[['carrier', 'dep_deploy', 'arr_delay']]
+flights = flights.dropna()
+```
+
+Run R code right next to it.
+
+```{r r-code-too}
+flights %>% 
+    ggplot(aes(x = carrier, y = arr_delay)) + 
+    ggplot2::geom_point() + 
+    ggplot2::geom_jitter()
+```
+
+
+## Setting up a Python 2 environment (in `conda`)
+
+This time we will set up the environment for Python 2.7.17 from the command-line using `conda`. The documentation for setting up `conda` environments can be found [here](https://conda.io/projects/conda/en/latest/user-guide/tasks/manage-environments.html#) and [here](https://docs.conda.io/projects/conda/en/latest/user-guide/concepts/environments.html).
+
+
+```bash
+(base) $ conda create -n r_py2 python=2.7.17
+```
+
+The Terminal is going to present the following information and ask if you'd like to proceed: 
+
+```bash
+Collecting package metadata (current_repodata.json): done
+Solving environment: done
+
+## Package Plan ##
+
+  environment location: /Users/martinfrigaard/anaconda3/envs/r_py2
+
+  added / updated specs:
+    - python=2.7.17
+
+
+The following NEW packages will be INSTALLED:
+
+  ca-certificates    pkgs/main/osx-64::ca-certificates-2019.11.27-0
+  certifi            pkgs/main/osx-64::certifi-2019.11.28-py27_0
+  libcxx             pkgs/main/osx-64::libcxx-4.0.1-hcfea43d_1
+  libcxxabi          pkgs/main/osx-64::libcxxabi-4.0.1-hcfea43d_1
+  libedit            pkgs/main/osx-64::libedit-3.1.20181209-hb402a30_0
+  libffi             pkgs/main/osx-64::libffi-3.2.1-h475c297_4
+  ncurses            pkgs/main/osx-64::ncurses-6.1-h0a44026_1
+  pip                pkgs/main/osx-64::pip-19.3.1-py27_0
+  python             pkgs/main/osx-64::python-2.7.17-h97142e2_0
+  readline           pkgs/main/osx-64::readline-7.0-h1de35cc_5
+  setuptools         pkgs/main/osx-64::setuptools-44.0.0-py27_0
+  sqlite             pkgs/main/osx-64::sqlite-3.30.1-ha441bb4_0
+  tk                 pkgs/main/osx-64::tk-8.6.8-ha441bb4_0
+  wheel              pkgs/main/osx-64::wheel-0.33.6-py27_0
+  zlib               pkgs/main/osx-64::zlib-1.2.11-h1de35cc_3
+
+
+Proceed ([y]/n)? y
+```
+
+Enter `y` and click `return`.
+
+```bash
+Preparing transaction: done
+Verifying transaction: done
+Executing transaction: done
+#
+# To activate this environment, use
+#
+#     $ conda activate r_py2
+#
+# To deactivate an active environment, use
+#
+#     $ conda deactivate
+
+```
+
+### Installing packages in `conda` environment 
+
+Next we will want to install a few packages in the `r_py2` environment (`scipy`, `pandas`, and `matplotlib`). We can do this with the code below:
+
+```bash
+$ conda install -n r_py2 scipy pandas matplotlib
+```
+
+We can double-check the information on this `conda` environment with `reticulate::conda_list()`
+
+```{r check-conda_list}
+reticulate::conda_list()
+```
+
+Now I can see *both* `r_py2` and `r_py3` there. I'll switch over to test Python 2 in this new environment.
+
+```{r switch-to-python2}
+reticulate::use_condaenv(condaenv = "r_py2")
+```
+
+And I can verify I am in the correct place with `reticulate::py_discover_config()`
+
+```{r check-r_py2-py_discover_config()}
+reticulate::py_discover_config()
+```
+
+## Test some Python 2 code 
+
+One of the most notable differences between Python 2 and Python 3 is the use of quotes and brackets
+
+https://docs.python.org/2/library/2to3.html
+
+### Removing conda environments
+
+If you're anything like us, you'll want to know how to destroy the thing you've just created (I'm calling this the, "Frankenstein heuristic"). We can remove this with the following commands in Terminal, 
+
+```bash
+conda remove --name "r_py2" --all
+```
+
+Or we can enter the following into an R code chunk. 
+
+```r
+reticulate::conda_remove(envname = "r_py2")
+```
+
+Great! Now we can start running the Python scripts. We can test this new environment with some Python 2.7 code. 
+
+I've put some Python 2.7 code 
+
+```{r}
+reticulate::conda_python(envname = "r_python2")
+```
+
+
+# Calculating Complexity (running a Python script)
+
+The python files are located in this Github repo, but we've downloaded them into this local folder, 
+
+```{r py-scripts}
+fs::dir_tree("code/py-scripts/miner")
+```
+
+The first Python file Tornhill refers to in the SDXR text is the `git_complexity_trend.py`.
+
+
+
+```{r git_complexity_trend.py}
+fs::dir_ls("code/py-scripts/miner", regex = "trend")
+```
+
+I've stored this in the file `code/py-scripts/miner/01.1-r-py3-git-complexity-trend.py`.
+
+```{r git_complexity_trend.py}
+fs::dir_ls("code/py-scripts/miner", regex = "py3")
+```
+
+
+We can run this script using the `reticulate::source_python()` function.
+
+```{r source_python}
+reticulate::source_python(file = "code/py-scripts/miner/01.1-r-py3-git-complexity-trend.py")
+```
+
+```{r}
+
+```
+
+
+> Calculating Complexity Trends with Python (version 2)
+
+The callout box in SDXR describes the Python scripts for calculating complexity 
+
+
+> For more information on what this code does, you should check out "Software Design X-Rays" by Adam Tornhill. 
+
+## Know the Biases in Complexity Trends (Tornhill, SDXR, page 26)
+
+> *It’s the trend that’s important, not the absolute values.*
+
+The file for calculating complexity is found in [this github repo](https://github.com/adamtornhill/maat-scripts) and on codescene.  We will be dissecting this code in Python and in R to see what it does, how to update it to Python 3, and to check if there are any improvements.
+
+Complexity is described in the text under the 
+
+### Git complexity trends with Python
+
+The original code is in the `py-scripts` folder under `merge`, `miner`, and `transform`.
+
+We can view this below, 
+
+```python
+######################################################################
+## This program calculates the complexity trend over a range of 
+## revisions in a Git repo.
+######################################################################
+
+#!/bin/env python
+import argparse
+import git_interactions
+import desc_stats
+import complexity_calculations
+	
+######################################################################
+## Statistics from complexity
+######################################################################
+
+def as_stats(revision, complexity_by_line):
+	return desc_stats.DescriptiveStats(revision, complexity_by_line)
+    
+######################################################################
+## Output
+######################################################################
+
+def as_csv(result):
+    print ('rev,n,total,mean,sd')
+    for stats in result:
+    	fields_of_interest = [stats.name, stats.n_revs, stats.total, round(stats.mean(),2), round(stats.sd(),2)]
+    	printable = [str(field) for field in fields_of_interest]
+    	print ','.join(printable)
+
+######################################################################
+## Main
+######################################################################
+
+def calculate_complexity_over_range(file_name, revision_range):
+	start_rev, end_rev = revision_range
+	revs = git_interactions.read_revs_for(file_name, start_rev, end_rev)
+	complexity_by_rev = []
+	for rev in revs:
+		historic_version = git_interactions.read_version_matching(file_name, rev)
+		complexity_by_line = complexity_calculations.calculate_complexity_in(historic_version)
+		complexity_by_rev.append(as_stats(rev, complexity_by_line))
+	return complexity_by_rev
+
+def run(args):
+	revision_range = args.start, args.end
+	complexity_trend = calculate_complexity_over_range(args.file, revision_range)
+	as_csv(complexity_trend)
+
+if __name__ == "__main__":
+	parser = argparse.ArgumentParser(description='Calculates whitespace complexity trends over a range of revisions.')
+	parser.add_argument('--start', required=True, help='The first commit hash to include')
+	parser.add_argument('--end', required=True, help='The last commit hash to include')
+	parser.add_argument('--file', required=True, type=str, help='The file to calculate complexity on')
+	
+	args = parser.parse_args()
+	run(args)
+```
+
+We want to run this code in RStudio first, then convert it to Python 3 if we can. 
+
+
+
+RStudio has published [directions for setting up Python in RStudio](https://support.rstudio.com/hc/en-us/articles/360023654474-Installing-and-Configuring-Python-with-RStudio).
+
+In the console, you'll see the following: 
+
+```
+> Would you like to install Miniconda? [Y/n]: y
+```
+
+Enter `y` and hit `return`. Following is installed with Miniconda3
+
+```
+PREFIX=/Users/martinfrigaard/Library/r-miniconda
+Unpacking payload ...
+Collecting package metadata (current_repodata.json): ...working... done                                       
+Solving environment: ...working... done
+
+## Package Plan ##
+
+  environment location: /Users/martinfrigaard/Library/r-miniconda
+
+  added / updated specs:
+    - asn1crypto==1.2.0=py37_0
+    - ca-certificates==2019.10.16=0
+    - certifi==2019.9.11=py37_0
+    - cffi==1.13.0=py37hb5b8e2f_0
+    - chardet==3.0.4=py37_1003
+    - conda-package-handling==1.6.0=py37h1de35cc_0
+    - conda==4.7.12=py37_0
+    - cryptography==2.8=py37ha12b0ac_0
+    - idna==2.8=py37_0
+    - libcxx==4.0.1=hcfea43d_1
+    - libcxxabi==4.0.1=hcfea43d_1
+    - libedit==3.1.20181209=hb402a30_0
+    - libffi==3.2.1=h475c297_4
+    - ncurses==6.1=h0a44026_1
+    - openssl==1.1.1d=h1de35cc_3
+    - pip==19.3.1=py37_0
+    - pycosat==0.6.3=py37h1de35cc_0
+    - pycparser==2.19=py37_0
+    - pyopenssl==19.0.0=py37_0
+    - pysocks==1.7.1=py37_0
+    - python.app==2=py37_9
+    - python==3.7.4=h359304d_1
+    - readline==7.0=h1de35cc_5
+    - requests==2.22.0=py37_0
+    - ruamel_yaml==0.15.46=py37h1de35cc_0
+    - setuptools==41.4.0=py37_0
+    - six==1.12.0=py37_0
+    - sqlite==3.30.0=ha441bb4_0
+    - tk==8.6.8=ha441bb4_0
+    - tqdm==4.36.1=py_0
+    - urllib3==1.24.2=py37_0
+    - wheel==0.33.6=py37_0
+    - xz==5.2.4=h1de35cc_4
+    - yaml==0.1.7=hc338f04_2
+    - zlib==1.2.11=h1de35cc_3
+
+
+The following NEW packages will be INSTALLED:
+
+  asn1crypto         pkgs/main/osx-64::asn1crypto-1.2.0-py37_0
+  ca-certificates    pkgs/main/osx-64::ca-certificates-2019.10.16-0
+  certifi            pkgs/main/osx-64::certifi-2019.9.11-py37_0
+  cffi               pkgs/main/osx-64::cffi-1.13.0-py37hb5b8e2f_0
+  chardet            pkgs/main/osx-64::chardet-3.0.4-py37_1003
+  conda              pkgs/main/osx-64::conda-4.7.12-py37_0
+  conda-package-han~ pkgs/main/osx-64::conda-package-handling-1.6.0-py37h1de35cc_0
+  cryptography       pkgs/main/osx-64::cryptography-2.8-py37ha12b0ac_0
+  idna               pkgs/main/osx-64::idna-2.8-py37_0
+  libcxx             pkgs/main/osx-64::libcxx-4.0.1-hcfea43d_1
+  libcxxabi          pkgs/main/osx-64::libcxxabi-4.0.1-hcfea43d_1
+  libedit            pkgs/main/osx-64::libedit-3.1.20181209-hb402a30_0
+  libffi             pkgs/main/osx-64::libffi-3.2.1-h475c297_4
+  ncurses            pkgs/main/osx-64::ncurses-6.1-h0a44026_1
+  openssl            pkgs/main/osx-64::openssl-1.1.1d-h1de35cc_3
+  pip                pkgs/main/osx-64::pip-19.3.1-py37_0
+  pycosat            pkgs/main/osx-64::pycosat-0.6.3-py37h1de35cc_0
+  pycparser          pkgs/main/osx-64::pycparser-2.19-py37_0
+  pyopenssl          pkgs/main/osx-64::pyopenssl-19.0.0-py37_0
+  pysocks            pkgs/main/osx-64::pysocks-1.7.1-py37_0
+  python             pkgs/main/osx-64::python-3.7.4-h359304d_1
+  python.app         pkgs/main/osx-64::python.app-2-py37_9
+  readline           pkgs/main/osx-64::readline-7.0-h1de35cc_5
+  requests           pkgs/main/osx-64::requests-2.22.0-py37_0
+  ruamel_yaml        pkgs/main/osx-64::ruamel_yaml-0.15.46-py37h1de35cc_0
+  setuptools         pkgs/main/osx-64::setuptools-41.4.0-py37_0
+  six                pkgs/main/osx-64::six-1.12.0-py37_0
+  sqlite             pkgs/main/osx-64::sqlite-3.30.0-ha441bb4_0
+  tk                 pkgs/main/osx-64::tk-8.6.8-ha441bb4_0
+  tqdm               pkgs/main/noarch::tqdm-4.36.1-py_0
+  urllib3            pkgs/main/osx-64::urllib3-1.24.2-py37_0
+  wheel              pkgs/main/osx-64::wheel-0.33.6-py37_0
+  xz                 pkgs/main/osx-64::xz-5.2.4-h1de35cc_4
+  yaml               pkgs/main/osx-64::yaml-0.1.7-hc338f04_2
+  zlib               pkgs/main/osx-64::zlib-1.2.11-h1de35cc_3
+
+
+Preparing transaction: ...working... done
+Executing transaction: ...working... done
+installation finished.
+Collecting package metadata (current_repodata.json): ...working... done
+Solving environment: ...working... done
+
+## Package Plan ##
+
+  environment location: /Users/martinfrigaard/Library/r-miniconda
+
+  added / updated specs:
+    - conda
+
+
+The following packages will be downloaded:
+
+    package                    |            build
+    ---------------------------|-----------------
+    asn1crypto-1.3.0           |           py37_0         167 KB
+    ca-certificates-2019.11.27 |                0         131 KB
+    certifi-2019.11.28         |           py37_0         156 KB
+    cffi-1.13.2                |   py37hb5b8e2f_0         218 KB
+    conda-4.8.1                |           py37_0         2.8 MB
+    pyopenssl-19.1.0           |           py37_0          87 KB
+    requests-2.22.0            |           py37_1          90 KB
+    ruamel_yaml-0.15.87        |   py37h1de35cc_0         237 KB
+    setuptools-44.0.0          |           py37_0         520 KB
+    six-1.13.0                 |           py37_0          26 KB
+    sqlite-3.30.1              |       ha441bb4_0         2.4 MB
+    tqdm-4.41.1                |             py_0          54 KB
+    urllib3-1.25.7             |           py37_0         165 KB
+    ------------------------------------------------------------
+                                           Total:         7.0 MB
+
+The following packages will be UPDATED:
+
+  asn1crypto                                   1.2.0-py37_0 --> 1.3.0-py37_0
+  ca-certificates                              2019.10.16-0 --> 2019.11.27-0
+  certifi                                  2019.9.11-py37_0 --> 2019.11.28-py37_0
+  cffi                                1.13.0-py37hb5b8e2f_0 --> 1.13.2-py37hb5b8e2f_0
+  conda                                       4.7.12-py37_0 --> 4.8.1-py37_0
+  pyopenssl                                   19.0.0-py37_0 --> 19.1.0-py37_0
+  requests                                    2.22.0-py37_0 --> 2.22.0-py37_1
+  ruamel_yaml                        0.15.46-py37h1de35cc_0 --> 0.15.87-py37h1de35cc_0
+  setuptools                                  41.4.0-py37_0 --> 44.0.0-py37_0
+  six                                         1.12.0-py37_0 --> 1.13.0-py37_0
+  sqlite                                  3.30.0-ha441bb4_0 --> 3.30.1-ha441bb4_0
+  tqdm                                          4.36.1-py_0 --> 4.41.1-py_0
+  urllib3                                     1.24.2-py37_0 --> 1.25.7-py37_0
+
+
+
+Downloading and Extracting Packages
+requests-2.22.0      | 90 KB     | ########## | 100% 
+certifi-2019.11.28   | 156 KB    | ########## | 100% 
+tqdm-4.41.1          | 54 KB     | ########## | 100% 
+asn1crypto-1.3.0     | 167 KB    | ########## | 100% 
+cffi-1.13.2          | 218 KB    | ########## | 100% 
+pyopenssl-19.1.0     | 87 KB     | ########## | 100% 
+conda-4.8.1          | 2.8 MB    | ########## | 100% 
+urllib3-1.25.7       | 165 KB    | ########## | 100% 
+sqlite-3.30.1        | 2.4 MB    | ########## | 100% 
+six-1.13.0           | 26 KB     | ########## | 100% 
+setuptools-44.0.0    | 520 KB    | ########## | 100% 
+ruamel_yaml-0.15.87  | 237 KB    | ########## | 100% 
+ca-certificates-2019 | 131 KB    | ########## | 100% 
+Preparing transaction: ...working... done
+Verifying transaction: ...working... done
+Executing transaction: ...working... done
+Collecting package metadata (current_repodata.json): ...working... done
+Solving environment: ...working... done
+
+## Package Plan ##
+
+  environment location: /Users/martinfrigaard/Library/r-miniconda/envs/r-reticulate
+
+  added / updated specs:
+    - numpy
+    - python=3.6
+
+
+The following packages will be downloaded:
+
+    package                    |            build
+    ---------------------------|-----------------
+    blas-1.0                   |              mkl           6 KB
+    certifi-2019.11.28         |           py36_0         156 KB
+    intel-openmp-2019.4        |              233         887 KB
+    libgfortran-3.0.1          |       h93005f0_2         426 KB
+    mkl-2019.4                 |              233       101.9 MB
+    mkl-service-2.3.0          |   py36hfbe908c_0         202 KB
+    mkl_fft-1.0.15             |   py36h5e564d8_0         160 KB
+    mkl_random-1.1.0           |   py36ha771720_0         287 KB
+    numpy-1.17.4               |   py36h890c691_0           4 KB
+    numpy-base-1.17.4          |   py36h6575580_0         3.9 MB
+    pip-19.3.1                 |           py36_0         1.9 MB
+    python-3.6.10              |       h359304d_0        17.1 MB
+    setuptools-44.0.0          |           py36_0         518 KB
+    six-1.13.0                 |           py36_0          26 KB
+    wheel-0.33.6               |           py36_0          40 KB
+    ------------------------------------------------------------
+                                           Total:       127.6 MB
+
+The following NEW packages will be INSTALLED:
+
+  blas               pkgs/main/osx-64::blas-1.0-mkl
+  ca-certificates    pkgs/main/osx-64::ca-certificates-2019.11.27-0
+  certifi            pkgs/main/osx-64::certifi-2019.11.28-py36_0
+  intel-openmp       pkgs/main/osx-64::intel-openmp-2019.4-233
+  libcxx             pkgs/main/osx-64::libcxx-4.0.1-hcfea43d_1
+  libcxxabi          pkgs/main/osx-64::libcxxabi-4.0.1-hcfea43d_1
+  libedit            pkgs/main/osx-64::libedit-3.1.20181209-hb402a30_0
+  libffi             pkgs/main/osx-64::libffi-3.2.1-h475c297_4
+  libgfortran        pkgs/main/osx-64::libgfortran-3.0.1-h93005f0_2
+  mkl                pkgs/main/osx-64::mkl-2019.4-233
+  mkl-service        pkgs/main/osx-64::mkl-service-2.3.0-py36hfbe908c_0
+  mkl_fft            pkgs/main/osx-64::mkl_fft-1.0.15-py36h5e564d8_0
+  mkl_random         pkgs/main/osx-64::mkl_random-1.1.0-py36ha771720_0
+  ncurses            pkgs/main/osx-64::ncurses-6.1-h0a44026_1
+  numpy              pkgs/main/osx-64::numpy-1.17.4-py36h890c691_0
+  numpy-base         pkgs/main/osx-64::numpy-base-1.17.4-py36h6575580_0
+  openssl            pkgs/main/osx-64::openssl-1.1.1d-h1de35cc_3
+  pip                pkgs/main/osx-64::pip-19.3.1-py36_0
+  python             pkgs/main/osx-64::python-3.6.10-h359304d_0
+  readline           pkgs/main/osx-64::readline-7.0-h1de35cc_5
+  setuptools         pkgs/main/osx-64::setuptools-44.0.0-py36_0
+  six                pkgs/main/osx-64::six-1.13.0-py36_0
+  sqlite             pkgs/main/osx-64::sqlite-3.30.1-ha441bb4_0
+  tk                 pkgs/main/osx-64::tk-8.6.8-ha441bb4_0
+  wheel              pkgs/main/osx-64::wheel-0.33.6-py36_0
+  xz                 pkgs/main/osx-64::xz-5.2.4-h1de35cc_4
+  zlib               pkgs/main/osx-64::zlib-1.2.11-h1de35cc_3
+
+
+
+Downloading and Extracting Packages
+mkl-service-2.3.0    | 202 KB    | ########## | 100% 
+six-1.13.0           | 26 KB     | ########## | 100% 
+intel-openmp-2019.4  | 887 KB    | ########## | 100% 
+wheel-0.33.6         | 40 KB     | ########## | 100% 
+blas-1.0             | 6 KB      | ########## | 100% 
+mkl_random-1.1.0     | 287 KB    | ########## | 100% 
+pip-19.3.1           | 1.9 MB    | ########## | 100% 
+numpy-1.17.4         | 4 KB      | ########## | 100% 
+libgfortran-3.0.1    | 426 KB    | ########## | 100% 
+mkl-2019.4           | 101.9 MB  | ########## | 100% 
+setuptools-44.0.0    | 518 KB    | ########## | 100% 
+mkl_fft-1.0.15       | 160 KB    | ########## | 100% 
+certifi-2019.11.28   | 156 KB    | ########## | 100% 
+numpy-base-1.17.4    | 3.9 MB    | ########## | 100% 
+python-3.6.10        | 17.1 MB   | ########## | 100% 
+Preparing transaction: ...working... done
+Verifying transaction: ...working... done
+Executing transaction: ...working... done
+#
+# To activate this environment, use
+#
+#     $ conda activate r-reticulate
+#
+# To deactivate an active environment, use
+#
+#     $ conda deactivate
+```
+
+
