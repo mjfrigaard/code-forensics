@@ -1,5 +1,5 @@
 ---
-title: "README - Git log analysis"
+title: "Git log analyses"
 author: "Martin Frigaard"
 date: "current version: `r Sys.Date()`"
 output: github_document

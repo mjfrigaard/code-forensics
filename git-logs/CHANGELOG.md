@@ -1,8 +1,8 @@
 ## 2016-04-08
 
-* Switched to cubic interpolation as default.
+ * Switched to cubic interpolation as default.
 * Moved question about family's TB history to end of questionnaire.
-
+ 
 ## 2016-04-06
 * Added option for cubic interpolation.
 
