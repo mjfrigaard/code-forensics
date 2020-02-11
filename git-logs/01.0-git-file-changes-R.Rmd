@@ -1,5 +1,5 @@
 ---
-title: "Aperture - Git log data"
+title: "Git log data - file changes"
 date: "`r Sys.Date()`"
 output: github_document
 ---

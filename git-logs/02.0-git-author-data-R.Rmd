@@ -1,5 +1,5 @@
 ---
-title:  "Aperture - Git author data"
+title:  "Git log data - author info"
 output: github_document
 ---
 
@@ -328,7 +328,7 @@ author_summary_file
 
 ```{r import-AuthSummShortlogRaw}
 # fs::dir_ls("data", recurse = FALSE)
-AuthSummShortlogRaw <- readr::read_table2(file = author_summary_file,
+AuthSummShortlogRaw <- readr::read_table2(file = "data/2020-01-15-author_summary.txt",
                                               col_names = c("no",
                                                     "commit_count",
                                                     "commit_author"))
