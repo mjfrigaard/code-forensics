@@ -209,7 +209,8 @@ HistLogs %>% head(10)
 
 ```{r branch-column}
 # Start with NA
-HistLogs <- HistLogs %>% dplyr::mutate(branch = NA_integer_)
+HistLogs <- HistLogs %>% 
+    dplyr::mutate(branch = NA_integer_)
 ```
 
 ```{r free_col}
@@ -270,17 +271,14 @@ for (i in seq_len(nrow(HistLogs) - 1)) { # - 1 to ignore root
 Let's export this just to be safe. 
 
 ```{r histlogs_out}
+source("code/outFile.R")
 histlogs_out <- outFile(file_path = "data", 
                         file_name = "Histlogs", 
                         file_extension = "rds")
 # export
 readr::write_rds(x = HistLogs, path = histlogs_out)
 # check
-fs::dir_tree(path = "data", regexp = "histlogs")
-# remove old files
-unlink(x = c("data/2019-10-09-174258-histlogs.rds",
-             "data/2019-10-09-182537-histlogs.rds",
-             "data/2019-10-09-191025-histlogs.rds"))
+fs::dir_tree(path = "data")
 ```
 
 This shows 10 different levels of `branch`...and apparently level `1` is the root.
@@ -310,7 +308,7 @@ listviewer::jsonedit(listdata = TenParentsBranches)
 We can see that even though there are observations with two commit tags. But if we check the elements in the `NineParentsBranches` tibble, we can see the two parent tags. 
 
 ```{r check-an-example}
-NineParentsBranches$parents[[18]]
+NineParentsBranches$parents
 ```
 
 If we enter one of these into the search bar: `"f6e72376"`
@@ -425,8 +423,11 @@ ggraph_git <- . %>%
   activate(nodes) %>% 
   dplyr::mutate(x = datetime, y = branch) %>% 
   # Plot with correct layout
-  create_layout(layout = "manual", node.positions = as_tibble(activate(., nodes))) %>% 
-  {ggraph(., layout = "manual") + theme_graph() + labs(caption = "Post by @drsimonj")}
+  create_layout(layout = "manual", 
+                node.positions = as_tibble(activate(., nodes))) %>% 
+    {ggraph(., layout = "manual") + 
+            theme_graph() +
+          labs(caption = "Post by @drsimonj")}
 # Using this pipeline:
 GitGraphData %>% 
   ggraph_git() +
