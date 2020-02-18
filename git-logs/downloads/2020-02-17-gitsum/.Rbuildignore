@@ -1,0 +1,14 @@
+^.*\.Rproj$
+^\.Rproj\.user$
+^README\.Rmd$
+^README-.*\.png$
+gitsum/
+benchmarking
+.travis.yml
+^appveyor\.yml$
+^docs$
+^API$
+^_pkgdown\.yml$
+^doc$
+CONTRIBUTING.md
+index.Rmd

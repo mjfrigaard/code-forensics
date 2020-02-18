@@ -1,0 +1,37 @@
+Package: gitsum
+Type: Package
+Title: Parse and summarize git repositories
+Version: 0.0.9001
+Authors@R: person("Lorenz", "Walthert", 
+    email = "lorenz.walthert@icloud.com", role = c("aut", "cre"))
+Description: This package parses a git repository history to collect 
+    comprehensive information about the activity in the repo. The parsed 
+    data is made available to the user in a tabular format and can be used to 
+    create various statistics on the repository. Graphs, figures or even 
+    reports can be generated automatically.
+Roxygen: list(markdown = TRUE, roclets = c("rd", "namespace", "collate", "pkgapi::api_roclet"))
+License: MIT + file LICENSE
+Encoding: UTF-8
+LazyData: true
+RoxygenNote: 6.1.1
+Depends: R(>= 2.10)
+Imports: 
+    lubridate,
+    cli,
+    dplyr (>= 0.7),
+    forcats,
+    magrittr,
+    readr,
+    rlang,
+    rmarkdown,
+    tidyr (>= 1.0.0),
+    purrr,
+    tibble,
+    stringr,
+    rprojroot,
+    ggplot2,
+    hms
+Suggests: 
+    testthat,
+    knitr
+VignetteBuilder: knitr

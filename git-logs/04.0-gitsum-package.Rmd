@@ -1,0 +1,121 @@
+---
+title: "Part 04 gitsum: A package for exploring Github data"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+library(rmdformats)
+require(tidyverse)
+library(plotly)
+require(janitor)
+require(skimr)
+library(gh)
+library(mosaic)
+library(inspectdf)
+library(visdat)
+library(DT)
+library(formatR)
+library(hrbrthemes)
+library(gcookbook)
+library(stringi)
+library(ggbeeswarm)
+library(listviewer)
+library(hrbrthemes)
+## Global options
+options(max.print = "75")
+# knitr chunk options ----
+knitr::opts_chunk$set(
+  echo = TRUE, # show/hide all code
+  tidy = FALSE, # cleaner code printing
+  comment = "#> ", # better console printing
+  eval = TRUE, # turn this to FALSE stop code chunks from running
+  message = TRUE, # show messages
+  fig.width = 9, # figure width
+  fig.height = 6, # figure height
+  warning = FALSE, # show warnings
+  size = "small", # size of the text
+  fig.path = "figs/"
+) # location of files
+# knit settings ----
+knitr::opts_knit$set(
+  width = 78
+)
+# base options ----
+base::options(
+  tibble.print_max = 25,
+  tibble.width = 78,
+  scipen = 100000000,
+  max.print = 999999
+)
+ggplot2::theme_set(hrbrthemes::theme_ipsum_ps(
+  base_size = 9,
+  strip_text_size = 10,
+  axis_title_size = 11,
+  plot_title_size = 15,
+  subtitle_size = 11,
+  base_family = "AndaleMono",
+  strip_text_family = "TitilliumWeb-Regular",
+  axis_title_family = "TitilliumWeb-Regular",
+  subtitle_family = "TitilliumWeb-Regular",
+  plot_title_family = "JosefinSans-Regular"
+))
+```
+
+## Install
+
+This is the install of the latest version from [Github here](https://lorenzwalthert.github.io/gitsum/). 
+
+```{r install}
+devtools::install_github("lorenzwalthert/gitsum")
+```
+
+## Load
+
+Load the package with `library()`.
+
+```{r load}
+library(gitsum)
+```
+
+## Overview 
+
+[`gitsum`](https://lorenzwalthert.github.io/gitsum/) is a package from [Lorenz Walthert](https://github.com/lorenzwalthert) that's designed to "*parse a git repository history to collect comprehensive information about the activity in the repo. The parsed data is made available to the user in a tabular format. The package can also generate reports based on the parse data.*
+
+## Functions in `gitsum`
+
+The documentation on `gitsum` can be found in the Github repo for this package. We can find the following files from the `downloads/2020-02-17-gitsum` folder. 
+
+```{r gitsum-R}
+fs::dir_tree("downloads/2020-02-17-gitsum", recurse = FALSE)
+```
+
+## `gitsum` - an example
+
+To demonstrate the abilities of `gitusm`, we're going to look at RStudio's [`ggplot2`](https://ggplot2.tidyverse.org/), an open source data visualization tool. 
+
+The package has been downloaded into the `downloads` folder here: 
+
+```{r downloads}
+fs::dir_tree("downloads/ggplot2", recurse = FALSE)
+```
+
+We will start with the `parse_log_simple()` and put the file path to the `downloads/ggplot2` folder. 
+
+```{r parse_log_simple}
+Ggp2PLogSimple <- gitsum::parse_log_simple(path = "downloads/ggplot2")
+Ggp2PLogSimple %>% utils::head(10)
+```
+
+
+There are two main functions for parsing the history, both return tabular data:
+
+- `parse_log_simple()` is a relatively fast parser and returns a tibble with one commit per row. There is no file-specific information.
+
+
+
+`parse_log_detailed()` outputs a nested tibble and for each commit, the names of the amended files, number of lines changed ect. available. This function is slower.
+
+
+
+
