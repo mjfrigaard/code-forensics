@@ -92,12 +92,18 @@ fs::dir_tree("downloads/2020-02-17-gitsum", recurse = FALSE)
 
 ## `gitsum` - an example
 
+> There are two main functions for parsing the history, both return tabular data:
+
+> - `parse_log_simple()` is a relatively fast parser and returns a tibble with one commit per row. There is no file-specific information.
+
 To demonstrate the abilities of `gitusm`, we're going to look at RStudio's [`ggplot2`](https://ggplot2.tidyverse.org/), an open source data visualization tool. 
 
 The package has been downloaded into the `downloads` folder here: 
 
 ```{r downloads}
-fs::dir_tree("downloads/ggplot2", recurse = FALSE)
+# ggplot2 folders 
+fs::dir_tree("downloads/ggplot2", 
+             recurse = FALSE)
 ```
 
 We will start with the `parse_log_simple()` and put the file path to the `downloads/ggplot2` folder. 
@@ -107,15 +113,41 @@ Ggp2PLogSimple <- gitsum::parse_log_simple(path = "downloads/ggplot2")
 Ggp2PLogSimple %>% utils::head(10)
 ```
 
+This function returns the following data. 
 
-There are two main functions for parsing the history, both return tabular data:
+```{r}
+visdat::vis_miss(Ggp2PLogSimple) +
+  ggplot2::coord_flip()
+```
 
-- `parse_log_simple()` is a relatively fast parser and returns a tibble with one commit per row. There is no file-specific information.
 
+```{r}
+inspectdf::inspect_types(Ggp2PLogSimple) %>% 
+  inspectdf::show_plot(text_labels = TRUE)
+```
+
+```{r}
+inspectdf::inspect_na(Ggp2PLogSimple) %>% 
+  inspectdf::show_plot(text_labels = TRUE)
+```
+
+```{r}
+inspectdf::inspect_cat(Ggp2PLogSimple) %>% 
+  inspectdf::show_plot(text_labels = TRUE)
+```
 
 
 `parse_log_detailed()` outputs a nested tibble and for each commit, the names of the amended files, number of lines changed ect. available. This function is slower.
 
+```{r Ggp2PLogDeets}
+Ggp2PLogDeets <- gitsum::parse_log_detailed(path = "downloads/ggplot2")
+Ggp2PLogDeets %>% utils::head(10)
+```
+
+```{r ggp2_nested_deets}
+ggp2_nested_deets <- Ggp2PLogDeets$nested
+ggp2_nested_deets %>% head()
+```
 
 
 
