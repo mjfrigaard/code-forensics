@@ -22,7 +22,7 @@ library(stringi)
 library(ggbeeswarm)
 library(listviewer)
 ## Global options
-options(max.print = "75")
+options(max.print = 999999999)
 # knitr chunk options ----
 knitr::opts_chunk$set(
   echo = TRUE, # show/hide all code
@@ -130,7 +130,7 @@ clone_cmd
 
 And execute the command using `system()`.
 
-In order to get the history from the gitlog, we'll need to combine the `git` commands with the `glue` and `system` commands.
+In order to get the history from the `gitlog`, we'll need to combine the `git` commands with the `glue` and `system` commands.
 
 ```{r clone-into-local-dir}
 # Invoke command

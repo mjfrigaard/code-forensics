@@ -84,21 +84,17 @@ library(gitsum)
 
 ## Functions in `gitsum`
 
-The documentation on `gitsum` can be found in the Github repo for this package. We can find the following files from the `downloads/2020-02-17-gitsum` folder. 
+The documentation on `gitsum` can be found in the [Github repo for this package](https://github.com/lorenzwalthert/gitsum). We're going to demonstrate the abilities of `gitusm` by looking at RStudio's [`ggplot2`](https://ggplot2.tidyverse.org/) package, an open source data visualization tool.
 
-```{r gitsum-R}
-fs::dir_tree("downloads/2020-02-17-gitsum", recurse = FALSE)
+First we need to clone the git repo into the downloads folder:
+
+```bash
+$ cd git-logs
+$ cd downloads
+$ git clone https://github.com/tidyverse/ggplot2.git
 ```
 
-## `gitsum` - an example
-
-> There are two main functions for parsing the history, both return tabular data:
-
-> - `parse_log_simple()` is a relatively fast parser and returns a tibble with one commit per row. There is no file-specific information.
-
-To demonstrate the abilities of `gitusm`, we're going to look at RStudio's [`ggplot2`](https://ggplot2.tidyverse.org/), an open source data visualization tool. 
-
-The package has been downloaded into the `downloads` folder here: 
+After downloading the package into the `downloads` folder, we can get a quick glimpse of the folder contents. 
 
 ```{r downloads}
 # ggplot2 folders 
@@ -106,36 +102,67 @@ fs::dir_tree("downloads/ggplot2",
              recurse = FALSE)
 ```
 
-We will start with the `parse_log_simple()` and put the file path to the `downloads/ggplot2` folder. 
+We can also use `fs` to store some of the details of the folder, files, and their contents. 
+
+```{r Ggplot2DirInfo}
+Ggplot2DirInfo <- fs::dir_info(path = "downloads/ggplot2", 
+                               recurse = TRUE,
+                               all = TRUE)
+Ggplot2DirInfo %>% dplyr::glimpse(78)
+```
+
+This 
+
+## `gitsum` - an example
+
+> There are two main functions for parsing the history, both return tabular data:
+
+> - `parse_log_simple()` is a relatively fast parser and returns a tibble with one commit per row. There is no file-specific information.
+
+ We will start with the `parse_log_simple()` and put the file path to the `downloads/ggplot2` folder. 
+
 
 ```{r parse_log_simple}
 Ggp2PLogSimple <- gitsum::parse_log_simple(path = "downloads/ggplot2")
-Ggp2PLogSimple %>% utils::head(10)
 ```
 
 This function returns the following data. 
 
-```{r}
+```{r Ggp2PLogSimple}
+Ggp2PLogSimple %>% dplyr::glimpse()
+```
+
+## Missing data from `parse_log_simple()`
+
+There are missing data 
+
+```{r vis_miss}
 visdat::vis_miss(Ggp2PLogSimple) +
   ggplot2::coord_flip()
 ```
 
+## Variable types in `parse_log_simple()`
 
-```{r}
+```{r inspect_types}
 inspectdf::inspect_types(Ggp2PLogSimple) %>% 
   inspectdf::show_plot(text_labels = TRUE)
 ```
 
-```{r}
+```{r inspect_na-simple-log}
 inspectdf::inspect_na(Ggp2PLogSimple) %>% 
   inspectdf::show_plot(text_labels = TRUE)
 ```
 
-```{r}
-inspectdf::inspect_cat(Ggp2PLogSimple) %>% 
+```{r inspect_cat-simple-log}
+ggp2_simplog_inspct_cat <- inspectdf::inspect_cat(Ggp2PLogSimple) 
+```
+
+```{r ggp2_simplog_inspct_cat}
+ggp2_simplog_inspct_cat %>% 
   inspectdf::show_plot(text_labels = TRUE)
 ```
 
+## 
 
 `parse_log_detailed()` outputs a nested tibble and for each commit, the names of the amended files, number of lines changed ect. available. This function is slower.
 
@@ -144,10 +171,7 @@ Ggp2PLogDeets <- gitsum::parse_log_detailed(path = "downloads/ggplot2")
 Ggp2PLogDeets %>% utils::head(10)
 ```
 
-```{r ggp2_nested_deets}
-ggp2_nested_deets <- Ggp2PLogDeets$nested
-ggp2_nested_deets %>% head()
-```
+
 
 
 
